@@ -30,7 +30,10 @@ document.head.appendChild(mLink);
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:#050A12;font-family:'Geologica',sans-serif}
-.app{display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:#050A12;color:#CBD5E1;font-family:'Geologica',sans-serif;padding-top:env(safe-area-inset-top)}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;background:#050A12;color:#CBD5E1;font-family:'Geologica',sans-serif;padding-top:env(safe-area-inset-top);position:relative}
+/* Debug overlay */
+#dbg{position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.95);color:#4ADE80;font-family:monospace;font-size:10px;padding:8px;z-index:99999;display:none;white-space:pre-wrap;word-break:break-all}
+#dbg.on{display:block}
 :root{
 --ice:#38BDF8;--ice-b:#7DD3FC;--ice-d:rgba(56,189,248,0.10);--ice-g:rgba(56,189,248,0.25);
 --red:#F87171;--red-d:rgba(248,113,113,0.12);--red-g:rgba(248,113,113,0.3);
@@ -272,6 +275,7 @@ textarea.fi{min-height:50px;resize:vertical}
 </style>
 </head>
 <body>
+<div id="dbg" class="on"></div>
 <div class="app" id="appRoot">
 <div id="splash"><div class="sp-mk">⛷️</div><div class="sp-t">SkiTrack</div><div class="sp-s">Free · Ad-Free · Data Stays Home</div><div class="sp-bar"><div class="sp-fill"></div></div></div>
 <!-- Auth Screen -->
@@ -476,6 +480,11 @@ textarea.fi{min-height:50px;resize:vertical}
 </div>
 
 <script>
+/* ═══ DEBUG ═══ */
+function dbg(msg){const el=document.getElementById('dbg');if(el){el.textContent+='['+new Date().toLocaleTimeString()+'] '+msg+'\n';el.scrollTop=el.scrollHeight}console.log(msg)}
+window.onerror=function(msg,url,line){dbg('ERROR: '+msg+' (line '+line+')')};
+window.addEventListener('unhandledrejection',e=>{dbg('PROMISE ERROR: '+e.reason)});
+dbg('Script loaded');
 /* ═══ RESORTS ═══ */
 const RS=[
 {id:'sunshine',nm:'Sunshine Village',lat:51.0784,lng:-115.7729,el:2730,vt:'1070m',ac:'3358',tr:137,rg:'Banff, AB',ds:'Three mountains, longest Canadian Rockies season.',trails:{green:20,blue:55,black:37,dblack:25},lifts:[{n:'Sunshine Gondola'},{n:'Angel Express'},{n:'Standish Express'},{n:'Goat\'s Eye Express'},{n:'Wolverine Express'},{n:'Wawa Chair'},{n:'Jackrabbit'},{n:'Strawberry Express'}]},
@@ -645,16 +654,19 @@ function wxSearch(q){
 /* ═══ FIREBASE INIT ═══ */
 const firebaseConfig={apiKey:"AIzaSyB6OfDfVUieR9mn3Ar_sYXP7GHR8xS2L1c",authDomain:"ski-track-b31c8.firebaseapp.com",databaseURL:"https://ski-track-b31c8-default-rtdb.firebaseio.com",projectId:"ski-track-b31c8",storageBucket:"ski-track-b31c8.firebasestorage.app",messagingSenderId:"745701514386",appId:"1:745701514386:web:797a64b698903fa0239a4b"};
 let fb,fbAuth,fbDb,fbUser=null,isGuest=false;
-try{fb=firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=firebase.database()}catch(e){console.warn('Firebase init failed:',e)}
+dbg('Firebase SDK loaded: '+(typeof firebase!=='undefined'));
+try{fb=firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=firebase.database();dbg('Firebase init OK')}catch(e){dbg('Firebase init FAILED: '+e.message)}
 
 /* ═══ AUTH ═══ */
 let authIsSignup=true;
 function showAuth(){
+  dbg('showAuth called');
   const el=document.getElementById('authScreen');
+  dbg('authScreen element exists: '+!!el);
   el.classList.add('on');
   el.style.display='flex'; // force visible even if CSS fails
   setAuthMode(true);
-  console.log('Auth screen shown');
+  dbg('Auth screen should be visible now');
 }
 function setAuthMode(signup){
   authIsSignup=signup;
@@ -803,62 +815,67 @@ async function reactFeed(runId,type){
 }
 
 /* ═══ INIT ═══ */
+dbg('Setting up DOMContentLoaded');
 window.addEventListener('DOMContentLoaded',async()=>{
-  // Phase 1: splash animation (2s)
+  dbg('DOM ready');
+  // Phase 1: splash
   setTimeout(()=>{
+    dbg('Splash fade out');
     document.getElementById('splash').classList.add('out');
-    // Phase 2: after splash fades, decide what to show
     setTimeout(async()=>{
+      dbg('Splash hidden, checking auth...');
       document.getElementById('splash').style.display='none';
-      // Check if returning guest
+      // Check returning guest FIRST (fastest path)
       let wasGuest=false;
-      try{wasGuest=localStorage.getItem('st-guest')==='true'}catch(e){}
+      try{wasGuest=localStorage.getItem('st-guest')==='true';dbg('Was guest: '+wasGuest)}catch(e){dbg('localStorage error: '+e.message)}
       if(wasGuest){
-        // Returning guest → boot directly
+        dbg('Returning guest → boot');
         isGuest=true;
-        try{await loadS()}catch(e){}
+        try{await loadS()}catch(e){dbg('loadS error: '+e.message)}
         bootApp();
         return;
       }
-      // Check Firebase auth
+      // Check Firebase
+      dbg('fbAuth exists: '+!!fbAuth);
       if(fbAuth){
-        // Show auth screen NOW while we check (prevents blank screen)
         let resolved=false;
-        // Give Firebase 3s to resolve, then force auth screen
-        const timeout=setTimeout(()=>{
-          if(!resolved){console.warn('Firebase auth timeout');showAuth()}
-        },3000);
+        // Force auth screen visible after 1.5s no matter what
+        const fallback=setTimeout(()=>{
+          if(!resolved){dbg('1.5s fallback → show auth');showAuth()}
+        },1500);
         try{
+          dbg('Listening for onAuthStateChanged...');
           fbAuth.onAuthStateChanged(async(user)=>{
-            if(resolved)return; // prevent double-fire
-            resolved=true;clearTimeout(timeout);
+            dbg('onAuthStateChanged fired, user: '+(user?user.email:'null'));
+            if(resolved){dbg('Already resolved, skipping');return}
+            resolved=true;clearTimeout(fallback);
             if(user){
-              // Returning signed-in user → boot directly
               fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
-              try{await loadS()}catch(e){}
+              dbg('Signed in user → loading data...');
+              try{await loadS()}catch(e){dbg('loadS error: '+e.message)}
+              dbg('Booting app...');
               bootApp();
             }else{
-              // No session → show auth
+              dbg('No user session → show auth');
               showAuth();
             }
           });
+          dbg('onAuthStateChanged listener registered');
         }catch(e){
-          resolved=true;clearTimeout(timeout);
-          console.error('Auth error:',e);
+          dbg('Auth listener error: '+e.message);
+          resolved=true;clearTimeout(fallback);
           showAuth();
         }
-        // Also show auth after 1.5s if nothing has happened (prevents blank screen)
-        setTimeout(()=>{
-          if(!resolved){showAuth()}
-        },1500);
       }else{
-        // No Firebase at all → show auth (they can use guest mode)
+        dbg('No Firebase → show auth');
         showAuth();
       }
     },400);
   },1800);
 });
+dbg('Init code registered');
 function bootApp(){
+  dbg('bootApp called, guest='+isGuest);
   // Hide auth screen if it was showing
   document.getElementById('authScreen').classList.remove('on');
   document.getElementById('authScreen').style.display='none';
