@@ -650,8 +650,11 @@ try{fb=firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=fireba
 /* ═══ AUTH ═══ */
 let authIsSignup=true;
 function showAuth(){
-  document.getElementById('authScreen').classList.add('on');
+  const el=document.getElementById('authScreen');
+  el.classList.add('on');
+  el.style.display='flex'; // force visible even if CSS fails
   setAuthMode(true);
+  console.log('Auth screen shown');
 }
 function setAuthMode(signup){
   authIsSignup=signup;
@@ -680,6 +683,7 @@ async function doAuth(){
     }
     fbUser=cred.user;cfg.uid=fbUser.uid;isGuest=false;
     document.getElementById('authScreen').classList.remove('on');
+    document.getElementById('authScreen').style.display='none';
     await loadS();bootApp();
   }catch(e){
     const msg=e.code==='auth/email-already-in-use'?'Email already registered — try signing in':e.code==='auth/wrong-password'?'Incorrect password':e.code==='auth/user-not-found'?'No account found — try signing up':e.code==='auth/invalid-email'?'Invalid email address':e.message;
@@ -690,7 +694,8 @@ function doGuest(){
   isGuest=true;
   cfg.uid='guest_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
   document.getElementById('authScreen').classList.remove('on');
-  loadS().then(()=>bootApp());
+  document.getElementById('authScreen').style.display='none';
+  loadS().then(()=>bootApp()).catch(()=>bootApp());
 }
 
 /* ═══ STATE ═══ */
@@ -799,51 +804,64 @@ async function reactFeed(runId,type){
 
 /* ═══ INIT ═══ */
 window.addEventListener('DOMContentLoaded',async()=>{
+  // Phase 1: splash animation (2s)
   setTimeout(()=>{
     document.getElementById('splash').classList.add('out');
-    setTimeout(()=>{
+    // Phase 2: after splash fades, decide what to show
+    setTimeout(async()=>{
       document.getElementById('splash').style.display='none';
-      // Safety timeout — if nothing loads in 5s, force auth screen
-      const safetyTimer=setTimeout(()=>{
-        console.warn('Safety timeout — forcing auth screen');
-        if(!document.getElementById('hdr').style.display||document.getElementById('hdr').style.display==='none'){
-          showAuth();
-        }
-      },5000);
-      // Check Firebase auth state
-      try{
-        if(fbAuth){
+      // Check if returning guest
+      let wasGuest=false;
+      try{wasGuest=localStorage.getItem('st-guest')==='true'}catch(e){}
+      if(wasGuest){
+        // Returning guest → boot directly
+        isGuest=true;
+        try{await loadS()}catch(e){}
+        bootApp();
+        return;
+      }
+      // Check Firebase auth
+      if(fbAuth){
+        // Show auth screen NOW while we check (prevents blank screen)
+        let resolved=false;
+        // Give Firebase 3s to resolve, then force auth screen
+        const timeout=setTimeout(()=>{
+          if(!resolved){console.warn('Firebase auth timeout');showAuth()}
+        },3000);
+        try{
           fbAuth.onAuthStateChanged(async(user)=>{
-            clearTimeout(safetyTimer);
-            try{
-              if(user){
-                fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
-                await loadS();bootApp();
-              }else{
-                // Check if previously used guest mode
-                const wasGuest=localStorage.getItem('st-guest');
-                if(wasGuest==='true'){isGuest=true;await loadS();bootApp();return}
-                showAuth();
-              }
-            }catch(e){
-              console.error('Auth callback error:',e);
+            if(resolved)return; // prevent double-fire
+            resolved=true;clearTimeout(timeout);
+            if(user){
+              // Returning signed-in user → boot directly
+              fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
+              try{await loadS()}catch(e){}
+              bootApp();
+            }else{
+              // No session → show auth
               showAuth();
             }
           });
-        }else{
-          clearTimeout(safetyTimer);
-          // Firebase unavailable, go guest
-          isGuest=true;await loadS();bootApp();
+        }catch(e){
+          resolved=true;clearTimeout(timeout);
+          console.error('Auth error:',e);
+          showAuth();
         }
-      }catch(e){
-        clearTimeout(safetyTimer);
-        console.error('Init error:',e);
-        isGuest=true;loadS().then(()=>bootApp()).catch(()=>bootApp());
+        // Also show auth after 1.5s if nothing has happened (prevents blank screen)
+        setTimeout(()=>{
+          if(!resolved){showAuth()}
+        },1500);
+      }else{
+        // No Firebase at all → show auth (they can use guest mode)
+        showAuth();
       }
-    },300);
-  },2000);
+    },400);
+  },1800);
 });
 function bootApp(){
+  // Hide auth screen if it was showing
+  document.getElementById('authScreen').classList.remove('on');
+  document.getElementById('authScreen').style.display='none';
   if(isGuest)try{localStorage.setItem('st-guest','true')}catch(e){}
   document.getElementById('hdr').style.display='flex';
   document.getElementById('pagesWrap').style.display='';
