@@ -22,6 +22,10 @@ document.head.appendChild(mLink);
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Geologica:wght@300;400;500;600;700;800&family=Azeret+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -133,6 +137,22 @@ textarea.fi{min-height:50px;resize:vertical}
 .rc-res{font-size:10px;color:var(--t3);margin-top:2px}.rc-row{display:flex;gap:14px;margin-top:8px}.rc-s .rv{font-family:var(--fm);font-size:12px;font-weight:600;color:var(--t1)}.rc-s .rl{font-size:8px;color:var(--t4);text-transform:uppercase}
 .rc-tags{display:flex;flex-wrap:wrap;gap:3px;margin-top:8px}.rc-note{font-size:10px;color:var(--t3);margin-top:6px;font-style:italic}
 .empty-st{text-align:center;padding:36px 20px;color:var(--t4)}.empty-st .es-i{font-size:36px;margin-bottom:8px}.empty-st p{font-size:12px;line-height:1.5}
+/* Run detail page */
+/* Auth screen */
+#authScreen{position:absolute;inset:0;z-index:7500;background:var(--bg0);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#authScreen.on{display:flex}
+.auth-logo{font-size:48px;margin-bottom:8px}
+.auth-title{font-size:24px;font-weight:700;color:var(--t1);margin-bottom:4px}
+.auth-sub{font-size:12px;color:var(--t3);margin-bottom:24px;text-align:center}
+.auth-form{width:100%;max-width:320px}
+.auth-form .fg{margin-bottom:12px}
+.auth-form .fi{padding:12px 14px;font-size:14px;border-radius:12px}
+.auth-toggle{text-align:center;margin-top:16px;font-size:12px;color:var(--t3)}
+.auth-toggle span{color:var(--ice);cursor:pointer;font-weight:600}
+.auth-err{color:var(--red);font-size:11px;text-align:center;margin-top:8px;min-height:16px}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--t4);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--bd2)}
+.btn-auth-guest{width:100%;padding:12px;border:1px solid var(--bd2);border-radius:12px;background:var(--bg3);color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;font-family:'Geologica'}
 /* Run detail page */
 .rd-back{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ice);cursor:pointer;margin-bottom:12px;padding:4px 0}
 .rd-back:active{opacity:.6}
@@ -254,6 +274,25 @@ textarea.fi{min-height:50px;resize:vertical}
 <body>
 <div class="app" id="appRoot">
 <div id="splash"><div class="sp-mk">⛷️</div><div class="sp-t">SkiTrack</div><div class="sp-s">Free · Ad-Free · Data Stays Home</div><div class="sp-bar"><div class="sp-fill"></div></div></div>
+<!-- Auth Screen -->
+<div id="authScreen">
+  <div class="auth-logo">⛷️</div>
+  <div class="auth-title">SkiTrack</div>
+  <div class="auth-sub">Create an account to sync across devices<br>and share with friends</div>
+  <div class="auth-form">
+    <div class="fg"><label>Email</label><input class="fi" id="authEmail" type="email" placeholder="you@email.com"></div>
+    <div class="fg"><label>Password</label><input class="fi" id="authPass" type="password" placeholder="6+ characters"></div>
+    <div class="fg" id="authNameRow"><label>Display Name</label><input class="fi" id="authName" placeholder="Your name"></div>
+    <button class="btn-p" id="authBtn" onclick="doAuth()">Create Account</button>
+    <div class="auth-err" id="authErr"></div>
+    <div class="auth-toggle">
+      <span id="authToggleMode"></span>
+    </div>
+    <div class="auth-divider">or</div>
+    <button class="btn-auth-guest" onclick="doGuest()">Continue without account</button>
+    <div style="font-size:9px;color:var(--t4);text-align:center;margin-top:6px">Guest mode — data stays on this device only</div>
+  </div>
+</div>
 <div class="lap-toast" id="lapToast">🔄 RUN #<span id="lapNum">1</span></div>
 <div class="hdr" id="hdr" style="display:none"><div class="hdr-l"><div class="hdr-i">⛷️</div><span class="hdr-n">SkiTrack</span></div><div class="gps-b"><div class="gps-d wait" id="gpsDot"></div><span id="gpsTxt">Searching</span></div></div>
 <div class="pages" id="pagesWrap" style="display:none">
@@ -405,6 +444,12 @@ textarea.fi{min-height:50px;resize:vertical}
 </div>
 <div class="cs"><div class="ct">Units</div><div class="chs"><div class="ch on" id="uM" onclick="sU('metric')">Metric</div><div class="ch" id="uI" onclick="sU('imperial')">Imperial</div></div></div>
 <div class="cs"><div class="ct">Data</div><button class="btn-g" onclick="expAll()">📦 Export</button><button class="btn-d" onclick="nukeAll()">🗑️ Delete All</button></div>
+<div class="cs"><div class="ct">Account</div>
+  <div style="font-size:11px;color:var(--t2);margin-bottom:8px" id="acctStatus"></div>
+  <button class="btn-g" id="btnSignOut" onclick="doSignOut()" style="display:none">🚪 Sign Out</button>
+  <button class="btn-p" id="btnSignIn" onclick="showAuth()" style="display:none">🔑 Sign In / Create Account</button>
+  <div style="font-size:9px;color:var(--t4);margin-top:6px">Signed-in users sync data to the cloud and appear in the community feed</div>
+</div>
 </div></div></div>
 </div>
 <!-- NAV -->
@@ -597,78 +642,196 @@ function wxSearch(q){
   el.innerHTML=matches.slice(0,5).map(r=>`<div class="sr-item" onclick="setWxResort(RS.find(x=>x.id==='${r.id}'));document.getElementById('wxSearchInput').value='';document.getElementById('wxSearchResults').innerHTML=''"><span class="sr-emoji">⛷️</span>${r.nm} — ${r.rg}</div>`).join('');
 }
 
+/* ═══ FIREBASE INIT ═══ */
+const firebaseConfig={apiKey:"AIzaSyB6OfDfVUieR9mn3Ar_sYXP7GHR8xS2L1c",authDomain:"ski-track-b31c8.firebaseapp.com",databaseURL:"https://ski-track-b31c8-default-rtdb.firebaseio.com",projectId:"ski-track-b31c8",storageBucket:"ski-track-b31c8.firebasestorage.app",messagingSenderId:"745701514386",appId:"1:745701514386:web:797a64b698903fa0239a4b"};
+let fb,fbAuth,fbDb,fbUser=null,isGuest=false;
+try{fb=firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=firebase.database()}catch(e){console.warn('Firebase init failed:',e)}
+
+/* ═══ AUTH ═══ */
+let authIsSignup=true;
+function showAuth(){
+  document.getElementById('authScreen').classList.add('on');
+  setAuthMode(true);
+}
+function setAuthMode(signup){
+  authIsSignup=signup;
+  document.getElementById('authNameRow').style.display=signup?'block':'none';
+  document.getElementById('authBtn').textContent=signup?'Create Account':'Sign In';
+  document.getElementById('authToggleMode').innerHTML=signup?'Already have an account? <span onclick="setAuthMode(false)">Sign In</span>':'Need an account? <span onclick="setAuthMode(true)">Sign Up</span>';
+  document.getElementById('authErr').textContent='';
+}
+async function doAuth(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const name=document.getElementById('authName').value.trim();
+  const errEl=document.getElementById('authErr');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Please fill in email and password';return}
+  if(authIsSignup&&pass.length<6){errEl.textContent='Password must be 6+ characters';return}
+  try{
+    let cred;
+    if(authIsSignup){
+      cred=await fbAuth.createUserWithEmailAndPassword(email,pass);
+      if(name)await cred.user.updateProfile({displayName:name});
+      cfg.name=name||email.split('@')[0];
+    }else{
+      cred=await fbAuth.signInWithEmailAndPassword(email,pass);
+      cfg.name=cred.user.displayName||email.split('@')[0];
+    }
+    fbUser=cred.user;cfg.uid=fbUser.uid;isGuest=false;
+    document.getElementById('authScreen').classList.remove('on');
+    await loadS();bootApp();
+  }catch(e){
+    const msg=e.code==='auth/email-already-in-use'?'Email already registered — try signing in':e.code==='auth/wrong-password'?'Incorrect password':e.code==='auth/user-not-found'?'No account found — try signing up':e.code==='auth/invalid-email'?'Invalid email address':e.message;
+    errEl.textContent=msg;
+  }
+}
+function doGuest(){
+  isGuest=true;
+  cfg.uid='guest_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  document.getElementById('authScreen').classList.remove('on');
+  loadS().then(()=>bootApp());
+}
+
 /* ═══ STATE ═══ */
 let cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:''};let runs=[];
 let map,userMk,trkPoly,rPins=[];let showPins=true,userPos=null,activeResort=null;
 let tracking=false,paused=false;let tk,clockInt=null,watchId=null,elevD=[];
 function rTk(){return{t0:null,elapsed:0,resumeAt:null,pos:[],spd:[],runIdx:[0],dist:0,maxSpd:0,eStart:null,eDrop:0,nR:0,
-  // Auto-run detection
-  altState:'idle', // 'idle'|'ascending'|'descending'
-  peakAlt:null,valleyAlt:null,
-  altBuf:[], // rolling buffer for smoothing
-  lastRunAlt:null, // altitude when last run was detected
-  runDetails:[] // {startIdx,endIdx,drop,dist} per run
+  altState:'idle',peakAlt:null,valleyAlt:null,altBuf:[],lastRunAlt:null,runDetails:[]
 }}tk=rTk();
-const AUTO_RUN_CFG={liftGain:30,runDrop:25,bufSize:5}; // min meters to count as lift/run
+const AUTO_RUN_CFG={liftGain:30,runDrop:25,bufSize:5};
+
+/* ═══ LOCAL STORAGE ═══ */
 async function loadS(){
-  try{const r=await window.storage.get('st-cfg');if(r?.value){cfg=JSON.parse(r.value);console.log('Config loaded:',cfg.name||'(no name)')}}catch(e){console.log('No saved config yet')}
-  if(!cfg.uid)cfg.uid='u_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  try{const r=await window.storage.get('st-runs');if(r?.value){runs=JSON.parse(r.value);console.log('Runs loaded:',runs.length)}}catch(e){console.log('No saved runs yet')}
+  // Try persistent storage first, fallback to localStorage
+  try{const r=await window.storage.get('st-cfg');if(r?.value){cfg={...cfg,...JSON.parse(r.value)}}}catch(e){
+    try{const s=localStorage.getItem('st-cfg');if(s)cfg={...cfg,...JSON.parse(s)}}catch(e2){}
+  }
+  if(fbUser)cfg.uid=fbUser.uid;
+  else if(!cfg.uid)cfg.uid='guest_'+Date.now();
+  try{const r=await window.storage.get('st-runs');if(r?.value)runs=JSON.parse(r.value)}catch(e){
+    try{const s=localStorage.getItem('st-runs');if(s)runs=JSON.parse(s)}catch(e2){}
+  }
+  // If logged in, also pull profile from Firebase
+  if(fbUser&&fbDb){
+    try{const snap=await fbDb.ref('profiles/'+cfg.uid).once('value');
+      if(snap.val()){const p=snap.val();cfg.name=p.name||cfg.name;cfg.bio=p.bio||cfg.bio;cfg.avatar=p.avatar||cfg.avatar;cfg.homeResort=p.resort||cfg.homeResort}
+    }catch(e){}
+  }
+  console.log('Loaded',runs.length,'runs, user:',cfg.name||cfg.uid);
 }
-async function saveS(){try{await window.storage.set('st-cfg',JSON.stringify(cfg))}catch(e){}try{await window.storage.set('st-runs',JSON.stringify(runs))}catch(e){}await publishProfile()}
-async function publishProfile(){const p={uid:cfg.uid,name:cfg.name||'Anonymous',bio:cfg.bio||'',avatar:cfg.avatar||'⛷️',resort:cfg.homeResort,stats:{runs:runs.reduce((a,r)=>a+(r.runs||1),0),dist:Math.round(runs.reduce((a,r)=>a+r.dist,0)*10)/10,vert:Math.round(runs.reduce((a,r)=>a+(r.eDrop||0),0)),topSpd:Math.round(Math.max(0,...runs.map(r=>r.maxSpd))),sessions:runs.length},badges:BADGES.filter(b=>b.ck(runs)).map(b=>b.id),updated:Date.now()};try{await window.storage.set('profile:'+cfg.uid,JSON.stringify(p),true)}catch(e){}}
-async function publishActivity(run){const a={uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:run.id,runName:run.name,resort:run.resort,dist:run.dist,maxSpd:run.maxSpd,runs:run.runs,eDrop:run.eDrop,sn:run.sn,wx:run.wx,notes:run.notes,rating:run.rating,ts:Date.now(),likes:[],cheers:[]};try{await window.storage.set('activity:'+run.id,JSON.stringify(a),true)}catch(e){}}
-async function loadCommunity(){
-  // ALWAYS start with local data as guaranteed baseline
-  const localProfile={uid:cfg.uid,name:cfg.name||'Anonymous',bio:cfg.bio||'',avatar:cfg.avatar||'⛷️',resort:cfg.homeResort,
+async function saveS(){
+  // Save locally (dual: persistent + localStorage fallback)
+  try{await window.storage.set('st-cfg',JSON.stringify(cfg))}catch(e){}
+  try{await window.storage.set('st-runs',JSON.stringify(runs))}catch(e){}
+  try{localStorage.setItem('st-cfg',JSON.stringify(cfg));localStorage.setItem('st-runs',JSON.stringify(runs))}catch(e){}
+  // Sync profile to Firebase
+  await publishProfile();
+}
+
+/* ═══ FIREBASE SYNC ═══ */
+function getProfileData(){
+  return{uid:cfg.uid,name:cfg.name||'Anonymous',bio:cfg.bio||'',avatar:cfg.avatar||'⛷️',resort:cfg.homeResort,
     stats:{runs:runs.reduce((a,r)=>a+(r.runs||1),0),dist:Math.round(runs.reduce((a,r)=>a+r.dist,0)*10)/10,vert:Math.round(runs.reduce((a,r)=>a+(r.eDrop||0),0)),topSpd:Math.round(Math.max(0,...runs.map(r=>r.maxSpd))),sessions:runs.length},
     badges:BADGES.filter(b=>b.ck(runs)).map(b=>b.id),updated:Date.now()};
-  // Build local activities from saved runs
-  const localActivities=runs.map(r=>({uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:r.id,runName:r.name,resort:r.resort,dist:r.dist,maxSpd:r.maxSpd,runs:r.runs,eDrop:r.eDrop,sn:r.sn,wx:r.wx,notes:r.notes,rating:r.rating,ts:new Date(r.date).getTime(),likes:[],cheers:[]}));
-  let profiles=[localProfile];
-  let activities=[...localActivities];
-  // Try to read shared storage for OTHER users' data
-  try{
-    const k=await window.storage.list('profile:',true);
-    if(k?.keys){for(const key of k.keys){try{const r=await window.storage.get(key,true);if(r?.value){const p=JSON.parse(r.value);if(p.uid!==cfg.uid)profiles.push(p);else{/* update our own from shared if newer */Object.assign(localProfile,p)}}}catch(e){}}}
-  }catch(e){console.log('Shared profiles unavailable, using local only')}
-  try{
-    const k=await window.storage.list('activity:',true);
-    if(k?.keys){
-      const sharedActs=[];
-      for(const key of k.keys){try{const r=await window.storage.get(key,true);if(r?.value){const a=JSON.parse(r.value);sharedActs.push(a)}}catch(e){}}
-      // Merge: use shared version if available (has likes/cheers), otherwise keep local
-      const sharedMap=new Map(sharedActs.map(a=>[a.runId,a]));
-      activities=localActivities.map(la=>sharedMap.get(la.runId)||la);
-      // Add other users' activities
-      sharedActs.filter(a=>a.uid!==cfg.uid).forEach(a=>{if(!activities.find(x=>x.runId===a.runId))activities.push(a)});
-    }
-  }catch(e){console.log('Shared activities unavailable, using local only')}
-  activities.sort((a,b)=>b.ts-a.ts);
+}
+async function publishProfile(){
+  if(!fbDb||isGuest)return;
+  try{await fbDb.ref('profiles/'+cfg.uid).set(getProfileData())}catch(e){console.warn('Profile sync failed:',e)}
+}
+async function publishActivity(run){
+  if(!fbDb||isGuest)return;
+  const a={uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:run.id,runName:run.name,resort:run.resort,
+    dist:run.dist,maxSpd:run.maxSpd,runs:run.runs,eDrop:run.eDrop,sn:run.sn,wx:run.wx,notes:run.notes,rating:run.rating,ts:Date.now()};
+  try{await fbDb.ref('activities/'+run.id).set(a)}catch(e){console.warn('Activity sync failed:',e)}
+}
+async function loadCommunity(){
+  // Local baseline
+  const localProfile=getProfileData();
+  const localActivities=runs.map(r=>({uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:r.id,runName:r.name,resort:r.resort,dist:r.dist,maxSpd:r.maxSpd,runs:r.runs,eDrop:r.eDrop,sn:r.sn,wx:r.wx,notes:r.notes,rating:r.rating,ts:new Date(r.date).getTime()}));
+  let profiles=[localProfile],activities=[...localActivities];
+  // Pull from Firebase
+  if(fbDb&&!isGuest){
+    try{
+      const pSnap=await fbDb.ref('profiles').orderByChild('updated').limitToLast(50).once('value');
+      if(pSnap.val()){const all=Object.values(pSnap.val());profiles=all;if(!all.find(p=>p.uid===cfg.uid))profiles.unshift(localProfile)}
+    }catch(e){console.log('Firebase profiles unavailable')}
+    try{
+      const aSnap=await fbDb.ref('activities').orderByChild('ts').limitToLast(50).once('value');
+      if(aSnap.val()){
+        const fbActs=Object.values(aSnap.val());
+        // Merge: keep Firebase version (has reactions), add local-only runs
+        const fbMap=new Map(fbActs.map(a=>[a.runId,a]));
+        activities=localActivities.map(la=>fbMap.get(la.runId)||la);
+        fbActs.filter(a=>a.uid!==cfg.uid).forEach(a=>{if(!activities.find(x=>x.runId===a.runId))activities.push(a)});
+      }
+    }catch(e){console.log('Firebase activities unavailable')}
+    // Load reactions
+    try{
+      const rSnap=await fbDb.ref('reactions').once('value');
+      if(rSnap.val()){
+        const rxns=rSnap.val();
+        activities.forEach(a=>{
+          a.likes=rxns[a.runId]?.likes?Object.keys(rxns[a.runId].likes):[];
+          a.cheers=rxns[a.runId]?.cheers?Object.keys(rxns[a.runId].cheers):[];
+        });
+      }
+    }catch(e){}
+  }
+  activities.sort((a,b)=>(b.ts||0)-(a.ts||0));
   return{profiles,activities};
+}
+async function reactFeed(runId,type){
+  if(!fbDb||isGuest){const t=document.getElementById('lapToast');t.innerHTML='🔒 Sign in to react';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1200);return}
+  try{
+    const ref=fbDb.ref('reactions/'+runId+'/'+type+'/'+cfg.uid);
+    const snap=await ref.once('value');
+    if(snap.val())await ref.remove();else await ref.set(true);
+    await refreshComm();
+  }catch(e){console.warn('React failed:',e)}
 }
 
 /* ═══ INIT ═══ */
 window.addEventListener('DOMContentLoaded',async()=>{
-  await loadS();
-  console.log('Loaded',runs.length,'runs from storage');
+  // Show splash
   setTimeout(()=>{
     document.getElementById('splash').classList.add('out');
     setTimeout(()=>{
       document.getElementById('splash').style.display='none';
-      document.getElementById('hdr').style.display='flex';
-      document.getElementById('pagesWrap').style.display='';
-      document.getElementById('navBar').style.display='flex';
-      initMap();initGPS();fillSel();applyCfg();
-      // Render all data views
-      renderRuns();
-      console.log('Rendered',runs.length,'runs to UI');
-      updateProfile();renderBadges();
-      refreshComm();
-      setWxResort(RS.find(x=>x.id===cfg.homeResort)||RS[0]);
+      // Check Firebase auth state
+      if(fbAuth){
+        fbAuth.onAuthStateChanged(async(user)=>{
+          if(user){
+            fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
+            await loadS();bootApp();
+          }else{
+            // Check if previously used guest mode
+            try{const g=localStorage.getItem('st-guest');if(g==='true'){isGuest=true;await loadS();bootApp();return}}catch(e){}
+            showAuth();
+          }
+        });
+      }else{
+        // Firebase unavailable, go guest
+        isGuest=true;await loadS();bootApp();
+      }
     },300);
   },2000);
 });
+function bootApp(){
+  if(isGuest)try{localStorage.setItem('st-guest','true')}catch(e){}
+  document.getElementById('hdr').style.display='flex';
+  document.getElementById('pagesWrap').style.display='';
+  document.getElementById('navBar').style.display='flex';
+  initMap();initGPS();fillSel();applyCfg();
+  renderRuns();updateProfile();renderBadges();refreshComm();
+  setWxResort(RS.find(x=>x.id===cfg.homeResort)||RS[0]);
+  // Show login status
+  const gpsArea=document.querySelector('.gps-b');
+  if(isGuest&&gpsArea){
+    const badge=document.createElement('span');badge.style.cssText='margin-left:6px;font-size:8px;color:var(--amb);font-family:var(--fm)';badge.textContent='GUEST';gpsArea.appendChild(badge);
+  }
+}
 function fillSel(){['cRes','svR'].forEach(id=>{const s=document.getElementById(id);RS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.nm+' — '+r.rg;s.appendChild(o)})})}
 function applyCfg(){document.getElementById('cName').value=cfg.name||'';document.getElementById('cBio').value=cfg.bio||'';document.getElementById('cRes').value=cfg.homeResort||'';if(cfg.unit==='imperial'){document.getElementById('uM').classList.remove('on');document.getElementById('uI').classList.add('on')}}
 
@@ -878,7 +1041,19 @@ function showTraceOnMain(id){const r=runs.find(x=>x.id===id);if(!r?.trace||!map)
 async function delR(id){if(!confirm('Delete this session?'))return;runs=runs.filter(r=>r.id!==id);await saveS();go('runs');renderRuns();updateProfile();renderBadges()}
 
 /* ═══ PROFILE ═══ */
-function updateProfile(){document.getElementById('profAvEmoji').textContent=cfg.avatar||'⛷️';document.getElementById('profName').textContent=cfg.name||'Set Your Name';document.getElementById('profBio').textContent=cfg.bio||'Tap Edit Profile below';const res=RS.find(x=>x.id===cfg.homeResort);document.getElementById('profResort').textContent=res?'📍 '+res.nm:'';const tR=runs.reduce((a,r)=>a+(r.runs||1),0),tD=runs.reduce((a,r)=>a+r.dist,0),tV=runs.reduce((a,r)=>a+(r.eDrop||0),0),tS=Math.max(0,...runs.map(r=>r.maxSpd));const f=v=>cfg.unit==='imperial'?v*.621371:v;document.getElementById('pr-runs').textContent=tR;document.getElementById('pr-dist').textContent=f(tD).toFixed(0);document.getElementById('pr-vert').textContent=Math.round(tV);document.getElementById('pr-top').textContent=f(tS).toFixed(0)}
+function updateProfile(){document.getElementById('profAvEmoji').textContent=cfg.avatar||'⛷️';document.getElementById('profName').textContent=cfg.name||'Set Your Name';document.getElementById('profBio').textContent=cfg.bio||'Tap Edit Profile below';const res=RS.find(x=>x.id===cfg.homeResort);document.getElementById('profResort').textContent=res?'📍 '+res.nm:'';const tR=runs.reduce((a,r)=>a+(r.runs||1),0),tD=runs.reduce((a,r)=>a+r.dist,0),tV=runs.reduce((a,r)=>a+(r.eDrop||0),0),tS=Math.max(0,...runs.map(r=>r.maxSpd));const f=v=>cfg.unit==='imperial'?v*.621371:v;document.getElementById('pr-runs').textContent=tR;document.getElementById('pr-dist').textContent=f(tD).toFixed(0);document.getElementById('pr-vert').textContent=Math.round(tV);document.getElementById('pr-top').textContent=f(tS).toFixed(0);
+  // Account status
+  const as=document.getElementById('acctStatus');const so=document.getElementById('btnSignOut');const si=document.getElementById('btnSignIn');
+  if(fbUser&&!isGuest){as.textContent='✅ Signed in as '+(fbUser.email||cfg.name);so.style.display='block';si.style.display='none'}
+  else{as.textContent='⚠️ Guest mode — data stays on this device only';so.style.display='none';si.style.display='block'}
+}
+async function doSignOut(){
+  if(!confirm('Sign out? Your local data will be kept.'))return;
+  try{await fbAuth.signOut()}catch(e){}
+  fbUser=null;isGuest=true;
+  try{localStorage.removeItem('st-guest')}catch(e){}
+  location.reload();
+}
 function renderBadges(){document.getElementById('badgesGrid').innerHTML=BADGES.map(b=>{const e=b.ck(runs);return`<div class="badge ${e?'earned':''}"><span class="b-ic">${e?b.ic:'🔒'}</span><span class="b-nm">${b.nm}</span></div>`}).join('')}
 function initAvPicker(){document.getElementById('avGrid').innerHTML=AVATARS.map(a=>`<div class="av-opt ${a===cfg.avatar?'on':''}" data-a="${a}" onclick="document.querySelectorAll('.av-opt').forEach(o=>o.classList.remove('on'));this.classList.add('on')">${a}</div>`).join('')}
 function pickAv(){const sel=document.querySelector('.av-opt.on');if(sel)cfg.avatar=sel.dataset.a;closeOv('ovAvatar');updateProfile();saveS()}
@@ -896,8 +1071,7 @@ async function refreshComm(){
     document.getElementById('feedList').innerHTML='<div style="padding:12px;background:var(--red-d);border:1px solid rgba(248,113,113,.3);border-radius:10px;font-size:10px;color:var(--red)">Community error: '+e.message+'</div>';
   }
 }
-function renderFeed(){const d=window._comm||{activities:[]};const el=document.getElementById('feedList');if(!d.activities.length){el.innerHTML='<div class="empty-st"><div class="es-i">🏔️</div><p>No activity yet</p></div>';return}const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';el.innerHTML=d.activities.slice(0,20).map(a=>{const res=RS.find(x=>x.id===a.resort);const tags=[...(a.sn||[]),...(a.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing'].includes(t)?'sn':'';return`<span class="tg ${c}">${t}</span>`}).join('');const isMe=a.uid===cfg.uid;return`<div class="feed-card"><div class="feed-hdr"><div class="feed-av">${a.avatar||'⛷️'}</div><div class="feed-meta"><div class="feed-name">${a.name}${isMe?' <span style="color:var(--ice);font-size:9px">(you)</span>':''}</div><div class="feed-time">${timeAgo(a.ts)}${res?' · '+res.nm:''}</div></div></div><div class="feed-body">${a.runName}${a.notes?' — "'+a.notes+'"':''} ${a.rating?'⭐'.repeat(a.rating):''}</div><div class="feed-stats"><div class="feed-stat"><div class="fv">${f(a.dist).toFixed(1)}${ud}</div><div class="fl">Dist</div></div><div class="feed-stat"><div class="fv">${f(a.maxSpd).toFixed(0)}${us}</div><div class="fl">Top</div></div><div class="feed-stat"><div class="fv">${a.runs||1}</div><div class="fl">Runs</div></div></div>${tags?`<div class="feed-tags">${tags}</div>`:''}<div class="feed-actions"><div class="feed-act ${(a.likes||[]).includes(cfg.uid)?'liked':''}" onclick="reactFeed('${a.runId}','likes',this)">❤️ ${(a.likes||[]).length||''}</div><div class="feed-act ${(a.cheers||[]).includes(cfg.uid)?'cheered':''}" onclick="reactFeed('${a.runId}','cheers',this)">🤙 ${(a.cheers||[]).length||''}</div></div></div>`}).join('')}
-async function reactFeed(runId,type){try{const r=await window.storage.get('activity:'+runId,true);if(!r?.value)return;const a=JSON.parse(r.value);if(!a[type])a[type]=[];const i=a[type].indexOf(cfg.uid);if(i>=0)a[type].splice(i,1);else a[type].push(cfg.uid);await window.storage.set('activity:'+runId,JSON.stringify(a),true);await refreshComm()}catch(e){}}
+function renderFeed(){const d=window._comm||{activities:[]};const el=document.getElementById('feedList');if(!d.activities.length){el.innerHTML='<div class="empty-st"><div class="es-i">🏔️</div><p>No activity yet</p></div>';return}const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';el.innerHTML=d.activities.slice(0,20).map(a=>{const res=RS.find(x=>x.id===a.resort);const tags=[...(a.sn||[]),...(a.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing'].includes(t)?'sn':'';return`<span class="tg ${c}">${t}</span>`}).join('');const isMe=a.uid===cfg.uid;return`<div class="feed-card"><div class="feed-hdr"><div class="feed-av">${a.avatar||'⛷️'}</div><div class="feed-meta"><div class="feed-name">${a.name}${isMe?' <span style="color:var(--ice);font-size:9px">(you)</span>':''}</div><div class="feed-time">${timeAgo(a.ts)}${res?' · '+res.nm:''}</div></div></div><div class="feed-body">${a.runName}${a.notes?' — "'+a.notes+'"':''} ${a.rating?'⭐'.repeat(a.rating):''}</div><div class="feed-stats"><div class="feed-stat"><div class="fv">${f(a.dist).toFixed(1)}${ud}</div><div class="fl">Dist</div></div><div class="feed-stat"><div class="fv">${f(a.maxSpd).toFixed(0)}${us}</div><div class="fl">Top</div></div><div class="feed-stat"><div class="fv">${a.runs||1}</div><div class="fl">Runs</div></div></div>${tags?`<div class="feed-tags">${tags}</div>`:''}<div class="feed-actions"><div class="feed-act ${(a.likes||[]).includes(cfg.uid)?'liked':''}" onclick="reactFeed('${a.runId}','likes')">❤️ ${(a.likes||[]).length||''}</div><div class="feed-act ${(a.cheers||[]).includes(cfg.uid)?'cheered':''}" onclick="reactFeed('${a.runId}','cheers')">🤙 ${(a.cheers||[]).length||''}</div></div></div>`}).join('')}
 function renderLB(){const d=window._comm||{profiles:[]};const cat=document.querySelector('.lb-cat.on')?.dataset.cat||'topspeed';const el=document.getElementById('lbList');let s=[...d.profiles];if(cat==='topspeed')s.sort((a,b)=>(b.stats?.topSpd||0)-(a.stats?.topSpd||0));else if(cat==='distance')s.sort((a,b)=>(b.stats?.dist||0)-(a.stats?.dist||0));else if(cat==='vertical')s.sort((a,b)=>(b.stats?.vert||0)-(a.stats?.vert||0));else s.sort((a,b)=>(b.stats?.runs||0)-(a.stats?.runs||0));s=s.slice(0,20);const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v;if(!s.length){el.innerHTML='<div class="empty-st"><p>No riders yet</p></div>';return}el.innerHTML=s.map((p,i)=>{const rc=i===0?'g':i===1?'s':i===2?'b':'';let val='';if(cat==='topspeed')val=f(p.stats?.topSpd||0).toFixed(0)+(imp?' mph':' km/h');else if(cat==='distance')val=f(p.stats?.dist||0).toFixed(1)+(imp?' mi':' km');else if(cat==='vertical')val=(p.stats?.vert||0).toLocaleString()+' m';else val=(p.stats?.runs||0);const isMe=p.uid===cfg.uid;return`<div class="lb-card" style="${isMe?'border-color:var(--ice);background:var(--ice-d)':''}"><div class="lb-rank ${rc}">${i+1}</div><div class="lb-av">${p.avatar||'⛷️'}</div><div class="lb-info"><div class="lb-name">${p.name}${isMe?' (you)':''}</div><div class="lb-sub">${p.stats?.sessions||0} sessions</div></div><div class="lb-val">${val}</div></div>`}).join('')}
 function lbCat(c){document.querySelectorAll('.lb-cat').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));renderLB()}
 function renderMembers(){const d=window._comm||{profiles:[]};const el=document.getElementById('membersList');if(!d.profiles.length){el.innerHTML='<div class="empty-st"><p>No riders</p></div>';return}el.innerHTML=d.profiles.map(p=>{const res=RS.find(x=>x.id===p.resort);const isMe=p.uid===cfg.uid;return`<div class="member-card"><div class="m-av">${p.avatar||'⛷️'}</div><div class="m-info"><div class="m-nm">${p.name}${isMe?' <span style="color:var(--ice)">(you)</span>':''}</div><div class="m-bio">${p.bio||'No bio'}${res?' · '+res.nm:''}</div><div class="m-stats">${p.stats?.sessions||0} sessions · ${p.stats?.runs||0} runs · ${(p.badges||[]).length} badges</div></div></div>`}).join('')}
