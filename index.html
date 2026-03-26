@@ -703,29 +703,34 @@ function rTk(){return{t0:null,elapsed:0,resumeAt:null,pos:[],spd:[],runIdx:[0],d
 const AUTO_RUN_CFG={liftGain:30,runDrop:25,bufSize:5};
 
 /* ═══ LOCAL STORAGE ═══ */
+const hasArtifactStorage=typeof window.storage!=='undefined'&&window.storage?.get;
 async function loadS(){
-  // Try persistent storage first, fallback to localStorage
-  try{const r=await window.storage.get('st-cfg');if(r?.value){cfg={...cfg,...JSON.parse(r.value)}}}catch(e){
-    try{const s=localStorage.getItem('st-cfg');if(s)cfg={...cfg,...JSON.parse(s)}}catch(e2){}
+  // Primary: localStorage (works everywhere)
+  try{const s=localStorage.getItem('st-cfg');if(s)cfg={...cfg,...JSON.parse(s)}}catch(e){}
+  try{const s=localStorage.getItem('st-runs');if(s)runs=JSON.parse(s)}catch(e){}
+  // Secondary: artifact storage (Claude preview only)
+  if(hasArtifactStorage){
+    try{const r=await window.storage.get('st-cfg');if(r?.value)cfg={...cfg,...JSON.parse(r.value)}}catch(e){}
+    try{const r=await window.storage.get('st-runs');if(r?.value){const ar=JSON.parse(r.value);if(ar.length>runs.length)runs=ar}}catch(e){}
   }
   if(fbUser)cfg.uid=fbUser.uid;
   else if(!cfg.uid)cfg.uid='guest_'+Date.now();
-  try{const r=await window.storage.get('st-runs');if(r?.value)runs=JSON.parse(r.value)}catch(e){
-    try{const s=localStorage.getItem('st-runs');if(s)runs=JSON.parse(s)}catch(e2){}
-  }
-  // If logged in, also pull profile from Firebase
+  // If logged in, pull profile from Firebase
   if(fbUser&&fbDb){
     try{const snap=await fbDb.ref('profiles/'+cfg.uid).once('value');
       if(snap.val()){const p=snap.val();cfg.name=p.name||cfg.name;cfg.bio=p.bio||cfg.bio;cfg.avatar=p.avatar||cfg.avatar;cfg.homeResort=p.resort||cfg.homeResort}
-    }catch(e){}
+    }catch(e){console.log('Firebase profile fetch skipped')}
   }
   console.log('Loaded',runs.length,'runs, user:',cfg.name||cfg.uid);
 }
 async function saveS(){
-  // Save locally (dual: persistent + localStorage fallback)
-  try{await window.storage.set('st-cfg',JSON.stringify(cfg))}catch(e){}
-  try{await window.storage.set('st-runs',JSON.stringify(runs))}catch(e){}
+  // Always save to localStorage
   try{localStorage.setItem('st-cfg',JSON.stringify(cfg));localStorage.setItem('st-runs',JSON.stringify(runs))}catch(e){}
+  // Also save to artifact storage if available
+  if(hasArtifactStorage){
+    try{await window.storage.set('st-cfg',JSON.stringify(cfg))}catch(e){}
+    try{await window.storage.set('st-runs',JSON.stringify(runs))}catch(e){}
+  }
   // Sync profile to Firebase
   await publishProfile();
 }
@@ -794,26 +799,46 @@ async function reactFeed(runId,type){
 
 /* ═══ INIT ═══ */
 window.addEventListener('DOMContentLoaded',async()=>{
-  // Show splash
   setTimeout(()=>{
     document.getElementById('splash').classList.add('out');
     setTimeout(()=>{
       document.getElementById('splash').style.display='none';
+      // Safety timeout — if nothing loads in 5s, force auth screen
+      const safetyTimer=setTimeout(()=>{
+        console.warn('Safety timeout — forcing auth screen');
+        if(!document.getElementById('hdr').style.display||document.getElementById('hdr').style.display==='none'){
+          showAuth();
+        }
+      },5000);
       // Check Firebase auth state
-      if(fbAuth){
-        fbAuth.onAuthStateChanged(async(user)=>{
-          if(user){
-            fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
-            await loadS();bootApp();
-          }else{
-            // Check if previously used guest mode
-            try{const g=localStorage.getItem('st-guest');if(g==='true'){isGuest=true;await loadS();bootApp();return}}catch(e){}
-            showAuth();
-          }
-        });
-      }else{
-        // Firebase unavailable, go guest
-        isGuest=true;await loadS();bootApp();
+      try{
+        if(fbAuth){
+          fbAuth.onAuthStateChanged(async(user)=>{
+            clearTimeout(safetyTimer);
+            try{
+              if(user){
+                fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
+                await loadS();bootApp();
+              }else{
+                // Check if previously used guest mode
+                const wasGuest=localStorage.getItem('st-guest');
+                if(wasGuest==='true'){isGuest=true;await loadS();bootApp();return}
+                showAuth();
+              }
+            }catch(e){
+              console.error('Auth callback error:',e);
+              showAuth();
+            }
+          });
+        }else{
+          clearTimeout(safetyTimer);
+          // Firebase unavailable, go guest
+          isGuest=true;await loadS();bootApp();
+        }
+      }catch(e){
+        clearTimeout(safetyTimer);
+        console.error('Init error:',e);
+        isGuest=true;loadS().then(()=>bootApp()).catch(()=>bootApp());
       }
     },300);
   },2000);
@@ -1081,7 +1106,10 @@ function timeAgo(ts){const d=Date.now()-ts;if(d<60000)return'just now';if(d<3600
 async function sCfg(){cfg.name=document.getElementById('cName').value;cfg.bio=document.getElementById('cBio').value;cfg.homeResort=document.getElementById('cRes').value;await saveS();updateProfile();await refreshComm();const t=document.getElementById('lapToast');t.innerHTML='✅ Profile Saved!';t.classList.add('show');setTimeout(()=>{t.classList.remove('show');t.innerHTML='🔄 RUN #<span id="lapNum">1</span>'},1500)}
 function sU(u){cfg.unit=u;document.getElementById('uM').classList.toggle('on',u==='metric');document.getElementById('uI').classList.toggle('on',u==='imperial');saveS();renderRuns();updateProfile()}
 function expAll(){const b=new Blob([JSON.stringify({settings:cfg,runs},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='skitrack-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
-async function nukeAll(){if(!confirm('Delete ALL?'))return;if(!confirm('Really?'))return;runs=[];cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:cfg.uid};try{await window.storage.delete('st-runs')}catch(e){}try{await window.storage.delete('st-cfg')}catch(e){}applyCfg();renderRuns();updateProfile();renderBadges()}
+async function nukeAll(){if(!confirm('Delete ALL?'))return;if(!confirm('Really?'))return;runs=[];cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:cfg.uid};
+try{localStorage.removeItem('st-runs');localStorage.removeItem('st-cfg')}catch(e){}
+if(hasArtifactStorage){try{await window.storage.delete('st-runs')}catch(e){}try{await window.storage.delete('st-cfg')}catch(e){}}
+applyCfg();renderRuns();updateProfile();renderBadges()}
 
 /* ═══ NAV ═══ */
 function go(pg){document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));document.getElementById('pg-'+pg).classList.add('on');document.querySelectorAll('.nav-b').forEach(b=>{const m=b.dataset.p===pg;b.classList.toggle('on',m);if(b.dataset.p==='track'&&tracking&&!m)b.classList.add('rec');else if(b.dataset.p==='track'&&!tracking)b.classList.remove('rec')});if(pg==='map'&&map)setTimeout(()=>map.invalidateSize(),100);if(pg==='runs')renderRuns();if(pg==='comm')refreshComm();if(pg==='profile'){updateProfile();renderBadges();initAvPicker()}}
