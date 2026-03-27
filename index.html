@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Cache control — forces fresh load -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>SkiTrack</title>
 <!-- PWA Meta -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -14,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.href,display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=18',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -481,8 +485,20 @@ textarea.fi{min-height:50px;resize:vertical}
 </div>
 
 <script>
-/* ═══ DEBUG ═══ */
-console.log('Script loaded');
+/* ═══ VERSION & AUTO-UPDATE ═══ */
+const APP_VERSION='v18';
+(function(){
+  try{
+    const last=localStorage.getItem('skitrack-version');
+    if(last&&last!==APP_VERSION){
+      console.log('Version changed:',last,'→',APP_VERSION);
+      // Clear any stale caches from old PWA installs
+      if('caches' in window){caches.keys().then(k=>k.forEach(n=>caches.delete(n)))}
+    }
+    localStorage.setItem('skitrack-version',APP_VERSION);
+  }catch(e){}
+})();
+console.log('SkiTrack',APP_VERSION,'loaded');
 /* ═══ RESORTS ═══ */
 const RS=[
 {id:'sunshine',nm:'Sunshine Village',lat:51.0784,lng:-115.7729,el:2730,vt:'1070m',ac:'3358',tr:137,rg:'Banff, AB',ds:'Three mountains, longest Canadian Rockies season.',trails:{green:20,blue:55,black:37,dblack:25},lifts:[{n:'Sunshine Gondola'},{n:'Angel Express'},{n:'Standish Express'},{n:'Goat\'s Eye Express'},{n:'Wolverine Express'},{n:'Wawa Chair'},{n:'Jackrabbit'},{n:'Strawberry Express'}]},
