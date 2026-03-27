@@ -340,7 +340,10 @@ textarea.fi{min-height:50px;resize:vertical}
 <div class="pg" id="pg-weather"><div class="pg-scr"><div class="wx-page">
   <h2>Weather & Snow</h2>
   <div class="wx-loc"><span class="wx-pin">📍</span><span id="wxLocName">Select a resort</span></div>
-  <div style="font-size:9px;color:var(--t4);margin-top:2px;font-style:italic" id="wxDisclaimer">Loading weather data...</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+    <div style="font-size:9px;color:var(--t4);font-style:italic" id="wxDisclaimer">Loading weather data...</div>
+    <div style="font-size:9px;color:var(--t4);font-family:var(--fm)" id="wxUpdated"></div>
+  </div>
   <!-- Location search -->
   <div class="fg" style="margin-top:8px"><input class="fi" id="wxSearchInput" placeholder="🔍 Search resort..." oninput="wxSearch(this.value)"></div>
   <div id="wxSearchResults" style="margin-bottom:8px"></div>
@@ -494,6 +497,32 @@ const RS=[
 {id:'marmot',nm:'Marmot Basin',lat:52.8019,lng:-117.6104,el:2601,vt:'914m',ac:'1720',tr:91,rg:'Jasper, AB',ds:'Jasper NP. Uncrowded, wind-loaded bowls.',trails:{green:15,blue:35,black:25,dblack:16},lifts:[{n:'Canadian Rockies Express'},{n:'Eagle Express'},{n:'Caribou Chair'},{n:'Knob Chair'}]},
 {id:'bigwhite',nm:'Big White',lat:49.7233,lng:-118.9326,el:2319,vt:'777m',ac:'2765',tr:119,rg:'Kelowna, BC',ds:'Champagne powder. Snow ghosts.',trails:{green:18,blue:40,black:35,dblack:26},lifts:[{n:'Bullet Express'},{n:'Gem Lake Express'},{n:'Snow Ghost Express'},{n:'Alpine T-Bar'},{n:'Black Forest Chair'}]},
 {id:'sunpeaks',nm:'Sun Peaks',lat:50.8837,lng:-119.8857,el:2152,vt:'882m',ac:'4270',tr:137,rg:'Kamloops, BC',ds:'Canada\'s 2nd largest.',trails:{green:20,blue:50,black:40,dblack:27},lifts:[{n:'Sunburst Express'},{n:'Crystal Chair'},{n:'Elevation Chair'},{n:'Morrisey Express'},{n:'Sundance Chair'}]},
+// ═══ EAST COAST ═══
+{id:'tremblant',nm:'Mont Tremblant',lat:46.2097,lng:-74.5854,el:875,vt:'645m',ac:'755',tr:102,rg:'Laurentians, QC',ds:'Eastern Canada\'s premier resort. Charming pedestrian village, 4 mountain faces, and excellent nightlife.',trails:{green:17,blue:33,black:32,dblack:20},lifts:[{n:'Cabriolet'},{n:'Flying Mile Express'},{n:'Duncan Express'},{n:'TGV Express'},{n:'Soleil Express'},{n:'Edge Express'},{n:'Lowell Thomas'}]},
+{id:'saintsauveur',nm:'Mont Saint-Sauveur',lat:45.9003,lng:-74.1700,el:416,vt:'213m',ac:'130',tr:40,rg:'Laurentians, QC',ds:'The Laurentians\' most popular. 30 min from Montreal. Huge night skiing, terrain parks, and a lively village scene.',trails:{green:8,blue:14,black:12,dblack:6},lifts:[{n:'Sommet Express'},{n:'Côté Nord Express'},{n:'Versant Nord-Ouest'},{n:'Tapis Magique'}]},
+{id:'avila',nm:'Mont Avila',lat:45.9100,lng:-74.1650,el:400,vt:'190m',ac:'75',tr:16,rg:'Laurentians, QC',ds:'Part of the Sommet Saint-Sauveur group. Family-focused with gentle terrain and a relaxed atmosphere. Great for beginners.',trails:{green:6,blue:6,black:3,dblack:1},lifts:[{n:'Avila Express'},{n:'Tapis Magique'}]},
+{id:'gabriel',nm:'Mont Gabriel',lat:45.9500,lng:-74.1467,el:490,vt:'200m',ac:'110',tr:18,rg:'Laurentians, QC',ds:'Classic Laurentian resort with a boutique hotel on-mountain. Natural snow terrain and a quieter feel than Saint-Sauveur.',trails:{green:4,blue:7,black:5,dblack:2},lifts:[{n:'Summit Express'},{n:'Chair Nord'},{n:'T-Bar'}]},
+{id:'morinheights',nm:'Sommet Morin Heights',lat:45.9167,lng:-74.2500,el:400,vt:'200m',ac:'100',tr:30,rg:'Laurentians, QC',ds:'Family-owned for 50+ years. Excellent glades, affordable, no-frills skiing. Strong local community.',trails:{green:6,blue:12,black:8,dblack:4},lifts:[{n:'Chair 1'},{n:'Chair 2'},{n:'Chair 3'},{n:'T-Bar'}]},
+{id:'montblanclaurentides',nm:'Mont Blanc',lat:46.1167,lng:-74.5167,el:585,vt:'300m',ac:'155',tr:43,rg:'Laurentians, QC',ds:'Highest vertical in the Laurentians after Tremblant. Known for consistent snow and varied terrain.',trails:{green:8,blue:16,black:12,dblack:7},lifts:[{n:'Summit Express'},{n:'Versant Nord Chair'},{n:'Chair Sud'}]},
+{id:'olympia',nm:'Mont Olympia',lat:45.9833,lng:-74.1833,el:380,vt:'190m',ac:'65',tr:23,rg:'Laurentians, QC',ds:'Great family hill between Saint-Sauveur and Morin Heights. Night skiing and affordable passes.',trails:{green:6,blue:9,black:6,dblack:2},lifts:[{n:'Summit Chair'},{n:'Poma Lift'},{n:'T-Bar'}]},
+{id:'valleebleue',nm:'Vallée Bleue',lat:45.9500,lng:-74.2167,el:360,vt:'170m',ac:'55',tr:18,rg:'Laurentians, QC',ds:'Hidden gem near Val-David. Quiet, family-friendly, affordable. Popular with locals avoiding the crowds.',trails:{green:5,blue:7,black:4,dblack:2},lifts:[{n:'Main Chair'},{n:'T-Bar'}]},
+{id:'habitant',nm:'Mont Habitant',lat:45.9211,lng:-74.1800,el:380,vt:'200m',ac:'60',tr:12,rg:'Laurentians, QC',ds:'One of the oldest ski hills in the Laurentians. No-frills, affordable, and popular with race clubs.',trails:{green:3,blue:4,black:3,dblack:2},lifts:[{n:'Main Chair'},{n:'T-Bar'}]},
+{id:'edelweiss',nm:'Sommet Edelweiss',lat:45.5478,lng:-75.5206,el:400,vt:'200m',ac:'120',tr:18,rg:'Outaouais, QC',ds:'20 min from Ottawa/Gatineau. Best hill in the National Capital Region. Good variety and night skiing.',trails:{green:4,blue:7,black:5,dblack:2},lifts:[{n:'Summit Express'},{n:'Chair 2'},{n:'Carpet Lift'}]},
+{id:'grandfonds',nm:'Mont Grand-Fonds',lat:47.6833,lng:-70.3000,el:735,vt:'335m',ac:'150',tr:18,rg:'Charlevoix, QC',ds:'Charlevoix\'s family resort. Good vertical, reliable snow, uncrowded. Also has cross-country and snowshoe trails.',trails:{green:4,blue:7,black:5,dblack:2},lifts:[{n:'Summit Chair'},{n:'T-Bar'}]},
+{id:'valinouet',nm:'Le Valinouët',lat:48.6833,lng:-71.0833,el:730,vt:'300m',ac:'115',tr:27,rg:'Saguenay, QC',ds:'Saguenay region powder haven. Averages 600cm+ annually. Remote, uncrowded, and genuine Quebec ski culture.',trails:{green:5,blue:10,black:8,dblack:4},lifts:[{n:'Express Quad'},{n:'Chair Nord'},{n:'T-Bar'}]},
+{id:'garceau',nm:'Mont Garceau',lat:46.3833,lng:-74.3167,el:520,vt:'305m',ac:'100',tr:28,rg:'Lanaudière, QC',ds:'One of the tallest verticals in the Laurentian region. Good mix of terrain. Popular with Montreal families.',trails:{green:6,blue:10,black:8,dblack:4},lifts:[{n:'Summit Express'},{n:'Chair Nord'},{n:'T-Bar'}]},
+{id:'stanne',nm:'Mont Sainte-Anne',lat:47.0747,lng:-70.9070,el:800,vt:'625m',ac:'460',tr:71,rg:'Quebec City, QC',ds:'Largest ski area near Quebec City. North-facing slopes hold snow well. Great cross-country network.',trails:{green:16,blue:27,black:18,dblack:10},lifts:[{n:'Gondola'},{n:'Express du Sud'},{n:'Express de la Boréale'},{n:'Express du Nord'}]},
+{id:'lemassif',nm:'Le Massif de Charlevoix',lat:47.2861,lng:-70.6332,el:770,vt:'770m',ac:'453',tr:53,rg:'Charlevoix, QC',ds:'Highest vertical east of the Rockies. Stunning St. Lawrence River views. Unique top-down access.',trails:{green:9,blue:20,black:16,dblack:8},lifts:[{n:'Gondola'},{n:'La Cote Express'},{n:'Le Charlevoix'}]},
+{id:'stoneham',nm:'Stoneham Mountain',lat:47.0185,lng:-71.3549,el:625,vt:'345m',ac:'375',tr:42,rg:'Quebec City, QC',ds:'20 minutes from Quebec City. Excellent night skiing and terrain park. Family-friendly.',trails:{green:8,blue:16,black:12,dblack:6},lifts:[{n:'Express des Étoiles'},{n:'Express du Nordet'},{n:'Express des Sommets'}]},
+{id:'owlshead',nm:'Owl\'s Head',lat:45.0408,lng:-72.1711,el:750,vt:'540m',ac:'200',tr:52,rg:'Eastern Townships, QC',ds:'On Lake Memphremagog. Steep terrain, beautiful lake views, uncrowded. Old-school vibe.',trails:{green:8,blue:18,black:16,dblack:10},lifts:[{n:'Summit Express'},{n:'Mountain Quad'},{n:'Little Owl Chair'}]},
+{id:'bromont',nm:'Bromont',lat:45.3156,lng:-72.6450,el:565,vt:'405m',ac:'450',tr:141,rg:'Eastern Townships, QC',ds:'Largest night skiing in North America. Huge terrain park. Year-round mountain biking.',trails:{green:30,blue:50,black:40,dblack:21},lifts:[{n:'Express du Sommet'},{n:'Express des Cimes'},{n:'Express du Village'},{n:'Express du Lac'}]},
+{id:'sutton',nm:'Mont Sutton',lat:45.1019,lng:-72.5568,el:968,vt:'460m',ac:'460',tr:60,rg:'Eastern Townships, QC',ds:'Famous for glades. 60% of terrain is forested. Authentic Quebecois ski culture.',trails:{green:8,blue:22,black:20,dblack:10},lifts:[{n:'Chair II Express'},{n:'Chair I'},{n:'Chair III'},{n:'Chair IV'}]},
+{id:'bluemountain',nm:'Blue Mountain',lat:44.5047,lng:-80.3167,el:475,vt:'220m',ac:'365',tr:43,rg:'Collingwood, ON',ds:'Ontario\'s largest ski area. On Georgian Bay. Active village, night skiing.',trails:{green:10,blue:18,black:10,dblack:5},lifts:[{n:'Silver Bullet Express'},{n:'Cascade Express'},{n:'Orchard Express'},{n:'Village Express'}]},
+{id:'crabbe',nm:'Crabbe Mountain',lat:45.9833,lng:-66.8667,el:305,vt:'260m',ac:'110',tr:30,rg:'Central NB',ds:'New Brunswick\'s largest ski hill. Family-owned, affordable, consistent snowmaking.',trails:{green:8,blue:12,black:7,dblack:3},lifts:[{n:'Summit Quad'},{n:'Tubing Tow'}]},
+{id:'martock',nm:'Ski Martock',lat:44.8667,lng:-64.1833,el:230,vt:'180m',ac:'75',tr:25,rg:'Windsor, NS',ds:'Nova Scotia\'s most popular. Night skiing, affordable, great for families and beginners.',trails:{green:7,blue:10,black:6,dblack:2},lifts:[{n:'Main Quad'},{n:'T-Bar'}]},
+{id:'marblemt',nm:'Marble Mountain',lat:48.8333,lng:-57.7833,el:520,vt:'335m',ac:'120',tr:37,rg:'Steady Brook, NL',ds:'Newfoundland\'s premier resort. Overlooking the Humber River. Surprisingly good snow and steep terrain.',trails:{green:7,blue:14,black:10,dblack:6},lifts:[{n:'Summit Quad'},{n:'East Side Quad'}]},
+{id:'lerelais',nm:'Le Relais',lat:46.9022,lng:-71.2211,el:525,vt:'335m',ac:'160',tr:32,rg:'Lac-Beauport, QC',ds:'15 min from Quebec City. Excellent night skiing. Affordable season passes. Local favourite.',trails:{green:6,blue:12,black:10,dblack:4},lifts:[{n:'Express du Sommet'},{n:'Chair du Nord'}]},
+{id:'poleymt',nm:'Poley Mountain',lat:45.8167,lng:-65.7500,el:400,vt:'210m',ac:'90',tr:30,rg:'Sussex, NB',ds:'Southern New Brunswick gem. Family-friendly with solid grooming and reliable snowmaking.',trails:{green:8,blue:12,black:7,dblack:3},lifts:[{n:'Main Chair'},{n:'T-Bar'}]},
 ];
 const AVATARS=['⛷️','🏂','🎿','🏔️','❄️','🐺','🦅','🐻','🦌','🌲','🔥','💎','⚡','🌟','👤','🎭','🧊','🏋️','🚀','🎯','🐧','🦊','🐾','🌊'];
 const BADGES=[{id:'first',nm:'First Run',ic:'🏅',ck:r=>r.length>=1},{id:'speed50',nm:'Speed Demon',ic:'⚡',ck:r=>r.some(x=>x.maxSpd>=50)},{id:'speed80',nm:'Mach Ski',ic:'🚀',ck:r=>r.some(x=>x.maxSpd>=80)},{id:'runs10',nm:'10 Runs',ic:'🎿',ck:r=>r.reduce((a,x)=>a+(x.runs||1),0)>=10},{id:'dist10',nm:'Explorer',ic:'🗺️',ck:r=>r.reduce((a,x)=>a+x.dist,0)>=10},{id:'vert1k',nm:'Vert 1k',ic:'📐',ck:r=>r.reduce((a,x)=>a+(x.eDrop||0),0)>=1000},{id:'powder',nm:'Pow Hound',ic:'❄️',ck:r=>r.some(x=>(x.sn||[]).includes('powder'))},{id:'resorts3',nm:'Hopper',ic:'🎯',ck:r=>[...new Set(r.filter(x=>x.resort).map(x=>x.resort))].length>=3},{id:'sessions5',nm:'Dedicated',ic:'🔥',ck:r=>r.length>=5},{id:'sessions20',nm:'Obsessed',ic:'💎',ck:r=>r.length>=20}];
@@ -505,26 +534,29 @@ function wmoIcon(code){return(WMO[code]||WMO[3])[0]}
 function wmoDesc(code){return(WMO[code]||WMO[3])[1]}
 
 async function fetchWeather(r){
-  const url=`https://api.open-meteo.com/v1/forecast?latitude=${r.lat}&longitude=${r.lng}&elevation=${r.el}&hourly=temperature_2m,snowfall,snow_depth,weathercode,windspeed_10m,relativehumidity_2m&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,weathercode,windspeed_10m_max&current_weather=true&timezone=auto&forecast_days=7&past_days=7`;
+  const url=`https://api.open-meteo.com/v1/forecast?latitude=${r.lat}&longitude=${r.lng}&elevation=${r.el}`
+    +`&hourly=temperature_2m,apparent_temperature,snowfall,snow_depth,weathercode,windspeed_10m,relativehumidity_2m,visibility`
+    +`&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_sum,weathercode,windspeed_10m_max`
+    +`&current_weather=true&timezone=auto&forecast_days=7&past_days=7`
+    +`&models=best_match`;
   try{
     const res=await fetch(url);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const d=await res.json();
     const cw=d.current_weather||{};
     const now=new Date();const nowH=now.getHours();
-    // Current
     const temp=Math.round(cw.temperature||0);
     const wind=Math.round(cw.windspeed||0);
     const code=cw.weathercode||3;
-    // Find current hour index in hourly data
+    // Find current hour in hourly data
     const todayStr=now.toISOString().slice(0,10);
     const hTimes=d.hourly?.time||[];
     const hIdx=hTimes.findIndex(t=>t.startsWith(todayStr)&&parseInt(t.slice(11,13))===nowH);
     const humid=hIdx>=0?(d.hourly.relativehumidity_2m?.[hIdx]||70):70;
+    const feel=hIdx>=0?Math.round(d.hourly.apparent_temperature?.[hIdx]||temp):temp;
+    const vis=hIdx>=0?Math.round((d.hourly.visibility?.[hIdx]||10000)/1000*10)/10:null; // m → km
     const snowDepthNow=hIdx>=0?(d.hourly.snow_depth?.[hIdx]||0):0;
-    // Feels like (wind chill approx)
-    const feel=temp<=10&&wind>4.8?Math.round(13.12+0.6215*temp-11.37*Math.pow(wind,0.16)+0.3965*temp*Math.pow(wind,0.16)):temp;
-    // Hourly forecast (next 24h from now)
+    // Hourly forecast (next 24h)
     const hours=[];
     for(let i=0;i<24;i++){
       const idx=hIdx+i;
@@ -535,7 +567,7 @@ async function fetchWeather(r){
       const hr=parseInt(hTimes[idx].slice(11,13));
       hours.push({time:hr,temp:hT,snow:hS,icon:wmoIcon(hC)});
     }
-    // Daily forecast
+    // Daily forecast (next 7 days from today)
     const dTimes=d.daily?.time||[];
     const todayDIdx=dTimes.findIndex(t=>t===todayStr);
     const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -547,26 +579,29 @@ async function fetchWeather(r){
       const hi=Math.round(d.daily.temperature_2m_max?.[di]||0);
       const lo=Math.round(d.daily.temperature_2m_min?.[di]||0);
       const snow=Math.round((d.daily.snowfall_sum?.[di]||0)*10)/10;
+      const precip=Math.round((d.daily.precipitation_sum?.[di]||0)*10)/10;
       const dc=d.daily.weathercode?.[di]||3;
       const nm=i===0?'Today':dayNames[dt.getDay()];
-      days.push({name:nm,hi,lo,snow,icon:wmoIcon(dc)});
+      days.push({name:nm,hi,lo,snow,precip,icon:wmoIcon(dc)});
       sn7d+=snow;if(i===0)sn24=snow;if(i<2)sn48+=snow;
     }
-    // Past 7 days snowfall for the bar chart
+    // Past 7 days snowfall
     const last7=[];
     for(let i=0;i<7;i++){
       const di=todayDIdx-6+i;
       if(di>=0&&di<dTimes.length)last7.push(Math.round((d.daily.snowfall_sum?.[di]||0)*10)/10);
       else last7.push(0);
     }
-    // Snow depth at base/summit (estimate summit = base + 40%)
+    // Snow depth
     const baseDepth=Math.round(snowDepthNow*100); // m → cm
-    const summitDepth=Math.round(baseDepth*1.4);
-    // Season total (rough: sum all snowfall in past 7 days data * scale)
-    const pastSnow=last7.reduce((a,b)=>a+b,0);
-    return{temp,icon:wmoIcon(code),desc:wmoDesc(code),feel,wind,humid,vis:null,hours,days,sn24:Math.round(sn24),sn48:Math.round(sn48),sn7d:Math.round(sn7d),base:baseDepth,summit:summitDepth,season:null,last7,maxDaySnow:Math.max(...days.map(d=>d.snow),1),live:true};
+    const summitDepth=baseDepth>0?Math.round(baseDepth*1.4):0;
+    return{temp,icon:wmoIcon(code),desc:wmoDesc(code),feel,wind,humid,vis,hours,days,
+      sn24:Math.round(sn24),sn48:Math.round(sn48),sn7d:Math.round(sn7d),
+      base:baseDepth,summit:summitDepth,season:null,last7,
+      maxDaySnow:Math.max(...days.map(d=>d.snow),1),live:true,
+      fetchedAt:new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})};
   }catch(e){
-    console.warn('Weather API failed, using estimate:',e.message);
+    console.warn('Weather API failed:',e.message);
     return genWeatherFallback(r);
   }
 }
@@ -596,7 +631,9 @@ async function setWxResort(r){
   const wx=await fetchWeather(r);
   // Data source label
   const discEl=document.getElementById('wxDisclaimer');
-  if(discEl) discEl.textContent=wx.live?'Live data from Open-Meteo.com (free, no API key)':'Estimated forecast — could not reach weather API';
+  if(discEl) discEl.textContent=wx.live?'Live · Open-Meteo.com':'Estimated — API unreachable';
+  const updEl=document.getElementById('wxUpdated');
+  if(updEl) updEl.textContent=wx.fetchedAt?'Updated '+wx.fetchedAt:'';
   // Current
   document.getElementById('wxHeroIcon').textContent=wx.icon;
   document.getElementById('wxHeroTemp').textContent=wx.temp+'°C';
@@ -898,7 +935,7 @@ const TL={
   gmaps:{url:'https://mt{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'}
 };
 let curTL=null,mapReady=false;
-function initMap(){if(typeof L==='undefined')return;try{map=L.map('theMap',{center:[51.08,-115.77],zoom:9,zoomControl:false,attributionControl:false});setLy('gmaps');addPins();mapReady=true;
+function initMap(){if(typeof L==='undefined')return;try{map=L.map('theMap',{center:[49.5,-85],zoom:4,zoomControl:false,attributionControl:false});setLy('gmaps');addPins();mapReady=true;
 map.on('click',function(e){const nearest=RS.reduce((best,r)=>{const d=Math.sqrt((r.lat-e.latlng.lat)**2+(r.lng-e.latlng.lng)**2);return d<best.d?{r,d}:best},{r:RS[0],d:999});if(nearest.d<1)setWxResort(nearest.r)});}catch(e){}}
 function setLy(k){if(!map)return;if(curTL)map.removeLayer(curTL);
 curTL=L.tileLayer(TL[k].url,{maxZoom:19,subdomains:k==='gmaps'?'0123':'abc'}).addTo(map);
