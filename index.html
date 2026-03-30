@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=21',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=22',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -340,7 +340,7 @@ textarea.fi{min-height:50px;resize:vertical}
   <b>+1</b> → manual run mark · <b>⏹</b> → end & save<br>
   <b>💡 Keep SkiTrack visible</b> — screen stays on while tracking
 </div>
-<button class="btn-g" onclick="go('runs')" style="margin:16px auto 0;display:block;max-width:280px">📋 View Past Runs</button>
+<button class="btn-g" onclick="go('runs')" style="margin:16px auto 0;display:block;width:calc(100% - 32px)">🎿 Past Sessions</button>
 </div></div></div>
 <!-- ═══ WEATHER PAGE ═══ -->
 <div class="pg" id="pg-weather"><div class="pg-scr"><div class="wx-page">
@@ -445,7 +445,7 @@ textarea.fi{min-height:50px;resize:vertical}
     <div class="prof-stat"><div class="ps-v" id="pr-vert">0</div><div class="ps-l">m Vert</div></div>
     <div class="prof-stat"><div class="ps-v" id="pr-top">0</div><div class="ps-l">Top</div></div>
   </div>
-  <button class="btn-g" onclick="go('runs')" style="margin-top:8px;width:100%">📋 View Run History</button>
+  <button class="btn-g" onclick="go('runs')" style="margin-top:10px;width:100%">🎿 View Run History</button>
 </div>
 <div class="cs"><div class="ct">Achievements</div><div class="badges-grid" id="badgesGrid"></div></div>
 <div class="cs"><div class="ct">Edit Profile</div>
@@ -489,7 +489,7 @@ textarea.fi{min-height:50px;resize:vertical}
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v21';
+const APP_VERSION='v22';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -709,15 +709,12 @@ console.log('Firebase SDK loaded: '+(typeof firebase!=='undefined'));
 try{fb=firebase.initializeApp(firebaseConfig);fbAuth=firebase.auth();fbDb=firebase.database();console.log('Firebase init OK')}catch(e){console.log('Firebase init FAILED: '+e.message)}
 
 /* ═══ AUTH ═══ */
-let authIsSignup=true;
+let authIsSignup=false;
 function showAuth(){
-  console.log('showAuth called');
   const el=document.getElementById('authScreen');
-  console.log('authScreen element exists: '+!!el);
   el.classList.add('on');
-  el.style.display='flex'; // force visible even if CSS fails
-  setAuthMode(false); // Default to Sign In
-  console.log('Auth screen should be visible now');
+  el.style.display='flex';
+  setAuthMode(false);
 }
 function setAuthMode(signup){
   authIsSignup=signup;
@@ -800,12 +797,13 @@ async function loadS(){
     }catch(e){console.log('Firebase profile fetch skipped')}
     // Also load runs from Firebase if local is empty
     if(runs.length===0){
-      try{const snap=await fbDb.ref('activities').orderByChild('uid').equalTo(cfg.uid).once('value');
+      try{const snap=await fbDb.ref('activities').limitToLast(100).once('value');
         if(snap.val()){
-          const fbRuns=Object.values(snap.val());
-          // Convert activities back to local run format
-          runs=fbRuns.map(a=>({id:a.runId,name:a.runName,resort:a.resort,date:new Date(a.ts).toISOString(),dur:0,dist:a.dist,maxSpd:a.maxSpd,avgSpd:0,eDrop:a.eDrop||0,runs:a.runs||1,sn:a.sn||[],wx:a.wx||[],notes:a.notes||'',rating:a.rating||0,trace:[]}));
-          console.log('Restored',runs.length,'runs from Firebase');
+          const allActs=Object.values(snap.val()).filter(a=>a.uid===cfg.uid);
+          if(allActs.length){
+            runs=allActs.map(a=>({id:a.runId,name:a.runName,resort:a.resort,date:new Date(a.ts).toISOString(),dur:0,dist:a.dist,maxSpd:a.maxSpd,avgSpd:0,eDrop:a.eDrop||0,runs:a.runs||1,sn:a.sn||[],wx:a.wx||[],notes:a.notes||'',rating:a.rating||0,trace:[]}));
+            console.log('Restored',runs.length,'runs from Firebase');
+          }
         }
       }catch(e){console.log('Firebase runs fetch skipped')}
     }
@@ -841,23 +839,28 @@ async function loadCommunity(){
   const localProfile=getProfileData();
   const localActivities=runs.map(r=>({uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:r.id,runName:r.name,resort:r.resort,dist:r.dist,maxSpd:r.maxSpd,runs:r.runs,eDrop:r.eDrop,sn:r.sn,wx:r.wx,notes:r.notes,rating:r.rating,ts:new Date(r.date).getTime()}));
   let profiles=[localProfile],activities=[...localActivities];
-  // Pull from Firebase
-  if(fbDb&&!isGuest){
+  // Pull from Firebase (everyone can READ, even guests)
+  if(fbDb){
     try{
-      const pSnap=await fbDb.ref('profiles').orderByChild('updated').limitToLast(50).once('value');
-      if(pSnap.val()){const all=Object.values(pSnap.val());profiles=all;if(!all.find(p=>p.uid===cfg.uid))profiles.unshift(localProfile)}
-    }catch(e){console.log('Firebase profiles unavailable')}
+      const pSnap=await fbDb.ref('profiles').limitToLast(100).once('value');
+      if(pSnap.val()){
+        const all=Object.values(pSnap.val());
+        // Start with all Firebase profiles
+        profiles=all;
+        // Make sure current user is included
+        if(!all.find(p=>p.uid===cfg.uid))profiles.unshift(localProfile);
+      }
+    }catch(e){console.log('Firebase profiles error:',e.message)}
     try{
-      const aSnap=await fbDb.ref('activities').orderByChild('ts').limitToLast(50).once('value');
+      const aSnap=await fbDb.ref('activities').limitToLast(100).once('value');
       if(aSnap.val()){
         const fbActs=Object.values(aSnap.val());
-        // Merge: keep Firebase version (has reactions), add local-only runs
+        // Merge: prefer Firebase version (has reactions), add local-only
         const fbMap=new Map(fbActs.map(a=>[a.runId,a]));
         activities=localActivities.map(la=>fbMap.get(la.runId)||la);
         fbActs.filter(a=>a.uid!==cfg.uid).forEach(a=>{if(!activities.find(x=>x.runId===a.runId))activities.push(a)});
       }
-    }catch(e){console.log('Firebase activities unavailable')}
-    // Load reactions
+    }catch(e){console.log('Firebase activities error:',e.message)}
     try{
       const rSnap=await fbDb.ref('reactions').once('value');
       if(rSnap.val()){
@@ -939,9 +942,11 @@ function bootApp(){
   renderRuns();updateProfile();renderBadges();refreshComm();
   setWxResort(RS.find(x=>x.id===cfg.homeResort)||RS[0]);
   // Show login status badge
+  const oldBadge=document.getElementById('guestBadge');
+  if(oldBadge)oldBadge.remove();
   const gpsArea=document.querySelector('.gps-b');
   if(isGuest&&gpsArea){
-    const badge=document.createElement('span');badge.style.cssText='margin-left:6px;font-size:8px;color:var(--amb);font-family:var(--fm)';badge.textContent='GUEST';gpsArea.appendChild(badge);
+    const badge=document.createElement('span');badge.id='guestBadge';badge.style.cssText='margin-left:6px;font-size:8px;color:var(--amb);font-family:var(--fm)';badge.textContent='GUEST';gpsArea.appendChild(badge);
   }
 }
 function fillSel(){['cRes','svR'].forEach(id=>{const s=document.getElementById(id);RS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.nm+' — '+r.rg;s.appendChild(o)})})}
