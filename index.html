@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=20',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=21',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -340,6 +340,7 @@ textarea.fi{min-height:50px;resize:vertical}
   <b>+1</b> → manual run mark · <b>⏹</b> → end & save<br>
   <b>💡 Keep SkiTrack visible</b> — screen stays on while tracking
 </div>
+<button class="btn-g" onclick="go('runs')" style="margin:16px auto 0;display:block;max-width:280px">📋 View Past Runs</button>
 </div></div></div>
 <!-- ═══ WEATHER PAGE ═══ -->
 <div class="pg" id="pg-weather"><div class="pg-scr"><div class="wx-page">
@@ -438,12 +439,13 @@ textarea.fi{min-height:50px;resize:vertical}
   <div class="prof-name" id="profName">Set Your Name</div>
   <div class="prof-bio" id="profBio">Tap Edit Profile below</div>
   <div class="prof-resort" id="profResort"></div>
-  <div class="prof-stats-row">
+  <div class="prof-stats-row" onclick="go('runs')" style="cursor:pointer">
     <div class="prof-stat"><div class="ps-v" id="pr-runs">0</div><div class="ps-l">Runs</div></div>
     <div class="prof-stat"><div class="ps-v" id="pr-dist">0</div><div class="ps-l">km</div></div>
     <div class="prof-stat"><div class="ps-v" id="pr-vert">0</div><div class="ps-l">m Vert</div></div>
     <div class="prof-stat"><div class="ps-v" id="pr-top">0</div><div class="ps-l">Top</div></div>
   </div>
+  <button class="btn-g" onclick="go('runs')" style="margin-top:8px;width:100%">📋 View Run History</button>
 </div>
 <div class="cs"><div class="ct">Achievements</div><div class="badges-grid" id="badgesGrid"></div></div>
 <div class="cs"><div class="ct">Edit Profile</div>
@@ -487,7 +489,7 @@ textarea.fi{min-height:50px;resize:vertical}
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v20';
+const APP_VERSION='v21';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -714,7 +716,7 @@ function showAuth(){
   console.log('authScreen element exists: '+!!el);
   el.classList.add('on');
   el.style.display='flex'; // force visible even if CSS fails
-  setAuthMode(true);
+  setAuthMode(false); // Default to Sign In
   console.log('Auth screen should be visible now');
 }
 function setAuthMode(signup){
