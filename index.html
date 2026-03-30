@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=22',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=23',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -422,7 +422,7 @@ textarea.fi{min-height:50px;resize:vertical}
 </div></div></div>
 <!-- ═══ COMMUNITY ═══ -->
 <div class="pg" id="pg-comm"><div class="pg-scr"><div class="comm-in">
-<h2>Community</h2>
+<h2>Community</h2><div style="font-size:9px;color:var(--t4);font-family:var(--fm);margin-bottom:4px" id="commDebug"></div>
 <div class="tab-row"><div class="tab-btn on" data-tab="feed" onclick="commTab('feed')">🏔️ Feed</div><div class="tab-btn" data-tab="lb" onclick="commTab('lb')">🏆 Board</div><div class="tab-btn" data-tab="members" onclick="commTab('members')">👥 Riders</div></div>
 <div class="tab-content on" id="tab-feed"><div id="feedList"><div class="empty-st"><div class="es-i">🏔️</div><p>No activity yet</p></div></div></div>
 <div class="tab-content" id="tab-lb"><div class="lb-cat-row"><div class="lb-cat on" data-cat="topspeed" onclick="lbCat('topspeed')">⚡ Speed</div><div class="lb-cat" data-cat="distance" onclick="lbCat('distance')">📏 Dist</div><div class="lb-cat" data-cat="vertical" onclick="lbCat('vertical')">🏔️ Vert</div><div class="lb-cat" data-cat="runs" onclick="lbCat('runs')">🎿 Runs</div></div><div id="lbList"></div></div>
@@ -489,7 +489,7 @@ textarea.fi{min-height:50px;resize:vertical}
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v22';
+const APP_VERSION='v23';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -845,12 +845,13 @@ async function loadCommunity(){
       const pSnap=await fbDb.ref('profiles').limitToLast(100).once('value');
       if(pSnap.val()){
         const all=Object.values(pSnap.val());
-        // Start with all Firebase profiles
+        console.log('Firebase returned',all.length,'profiles:',all.map(p=>p.name||p.uid).join(', '));
         profiles=all;
-        // Make sure current user is included
         if(!all.find(p=>p.uid===cfg.uid))profiles.unshift(localProfile);
+      }else{
+        console.log('Firebase profiles: null (empty database)');
       }
-    }catch(e){console.log('Firebase profiles error:',e.message)}
+    }catch(e){console.log('Firebase profiles error:',e.code||e.message)}
     try{
       const aSnap=await fbDb.ref('activities').limitToLast(100).once('value');
       if(aSnap.val()){
@@ -939,7 +940,10 @@ function bootApp(){
   document.getElementById('pagesWrap').style.display='';
   document.getElementById('navBar').style.display='flex';
   initMap();initGPS();fillSel();applyCfg();
-  renderRuns();updateProfile();renderBadges();refreshComm();
+  renderRuns();updateProfile();renderBadges();
+  // Publish profile to Firebase on boot (so other users can see us)
+  if(!isGuest)publishProfile().then(()=>refreshComm()).catch(()=>refreshComm());
+  else refreshComm();
   setWxResort(RS.find(x=>x.id===cfg.homeResort)||RS[0]);
   // Show login status badge
   const oldBadge=document.getElementById('guestBadge');
@@ -1225,6 +1229,8 @@ async function refreshComm(){
   try{
     const data=await loadCommunity();
     console.log('Community loaded:',data.profiles.length,'profiles,',data.activities.length,'activities');
+    const dbg=document.getElementById('commDebug');
+    if(dbg)dbg.textContent=data.profiles.length+' riders · '+data.activities.length+' activities';
     window._comm=data;
     renderFeed();renderLB();renderMembers();
   }catch(e){
