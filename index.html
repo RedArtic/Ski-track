@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=23',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=25',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -172,6 +172,20 @@ textarea.fi{min-height:50px;resize:vertical}
 .rd-elev canvas{width:100%;height:100%;display:block}
 .rd-elev .re-lbl{position:absolute;top:4px;left:6px;font-size:8px;font-family:var(--fm);color:var(--t4);text-transform:uppercase}
 .rd-section-title{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:1px;font-family:var(--fm);margin-top:14px;margin-bottom:6px}
+/* Photo preview */
+.photo-thumb{width:60px;height:60px;border-radius:8px;object-fit:cover;border:1px solid var(--bd2)}
+.photo-thumb-wrap{position:relative;display:inline-block}
+.photo-thumb-x{position:absolute;top:-4px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--red);color:white;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--bg0)}
+/* Charts */
+.rd-chart{width:100%;height:80px;border-radius:10px;margin-top:6px;border:1px solid var(--bd1);background:var(--bg3);overflow:hidden;position:relative}
+.rd-chart canvas{width:100%;height:100%;display:block}
+.rd-chart .rc-lbl{position:absolute;top:4px;left:6px;font-size:8px;font-family:var(--fm);color:var(--t4);text-transform:uppercase}
+.rd-chart .rc-val{position:absolute;top:4px;right:6px;font-size:8px;font-family:var(--fm);color:var(--t3)}
+/* Photo gallery */
+.rd-photos{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.rd-photo{width:calc(33.3% - 4px);aspect-ratio:1;border-radius:10px;object-fit:cover;cursor:pointer;border:1px solid var(--bd1)}
+.rd-photo-full{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.95);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.rd-photo-full img{max-width:95%;max-height:90vh;border-radius:8px}
 /* Profile */
 .prof-in{padding:14px 14px 80px}
 .prof-header{text-align:center;padding:16px 0}
@@ -475,9 +489,15 @@ textarea.fi{min-height:50px;resize:vertical}
 <!-- SAVE MODAL -->
 <div class="ov" id="ovSave"><div class="sh"><div class="sh-bar"></div><h3>💾 Save Session</h3>
 <div class="fg"><label>Name</label><input class="fi" id="svN" placeholder="e.g. Morning powder"></div>
-<div class="fg"><label>Resort</label><select class="fi" id="svR"><option value="">Select...</option></select></div>
+<div class="fg"><label>Resort</label><select class="fi" id="svR" onchange="document.getElementById('svCustomRes').style.display=this.value==='_custom'?'block':'none'"><option value="">Select...</option></select>
+<input class="fi" id="svCustomRes" placeholder="Enter resort name..." style="display:none;margin-top:6px"></div>
 <div class="fg"><label>Snow</label><div class="chs" id="snC"><div class="ch" data-v="powder" onclick="tc(this)">❄️ Powder</div><div class="ch" data-v="groomed" onclick="tc(this)">🟦 Groomed</div><div class="ch" data-v="packed" onclick="tc(this)">🧊 Packed</div><div class="ch" data-v="icy" onclick="tc(this)">🥶 Icy</div><div class="ch" data-v="slush" onclick="tc(this)">💧 Slush</div><div class="ch" data-v="moguls" onclick="tc(this)">🏔️ Moguls</div></div></div>
 <div class="fg"><label>Weather</label><div class="chs" id="wxC"><div class="ch" data-v="sunny" onclick="tc(this)">☀️ Sun</div><div class="ch" data-v="cloudy" onclick="tc(this)">☁️ Cloud</div><div class="ch" data-v="snowing" onclick="tc(this)">🌨️ Snow</div><div class="ch" data-v="windy" onclick="tc(this)">💨 Wind</div><div class="ch" data-v="foggy" onclick="tc(this)">🌫️ Fog</div><div class="ch" data-v="freezing" onclick="tc(this)">🥶 Cold</div></div></div>
+<div class="fg"><label>Photos</label>
+  <input type="file" id="svPhotos" accept="image/*" multiple style="display:none" onchange="previewPhotos(this.files)">
+  <button class="btn-g" onclick="document.getElementById('svPhotos').click()" style="width:100%">📷 Add Photos</button>
+  <div id="svPhotoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+</div>
 <div class="fg"><label>Notes</label><textarea class="fi" id="svNo" placeholder="How was it?"></textarea></div>
 <div class="fg"><label>Rating</label><div class="chs" id="rtC"><div class="ch" data-v="1" onclick="pR(this)">⭐</div><div class="ch" data-v="2" onclick="pR(this)">⭐⭐</div><div class="ch" data-v="3" onclick="pR(this)">⭐⭐⭐</div><div class="ch" data-v="4" onclick="pR(this)">⭐⭐⭐⭐</div><div class="ch" data-v="5" onclick="pR(this)">⭐⭐⭐⭐⭐</div></div></div>
 <div class="fg"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="svShare" checked style="accent-color:var(--ice)"> Share to Community</label></div>
@@ -485,11 +505,30 @@ textarea.fi{min-height:50px;resize:vertical}
 </div></div>
 <div class="ov" id="ovView"><div class="sh" id="vSheet"></div></div>
 <div class="ov" id="ovAvatar"><div class="sh"><div class="sh-bar"></div><h3>Choose Avatar</h3><div class="av-grid" id="avGrid"></div><button class="btn-p" onclick="pickAv()" style="margin-top:10px">Done</button></div></div>
+<!-- EDIT SESSION MODAL -->
+<div class="ov" id="ovEdit"><div class="sh"><div class="sh-bar"></div><h3>✏️ Edit Session</h3>
+<div class="fg"><label>Name</label><input class="fi" id="edN"></div>
+<div class="fg"><label>Resort</label><select class="fi" id="edR"><option value="">Select...</option></select>
+<input class="fi" id="edCustomRes" placeholder="Custom resort name..." style="display:none;margin-top:6px"></div>
+<div class="fg"><label>Notes</label><textarea class="fi" id="edNo"></textarea></div>
+<div class="fg"><label>Rating</label><div class="chs" id="edRtC"><div class="ch" data-v="1" onclick="pRed(this)">⭐</div><div class="ch" data-v="2" onclick="pRed(this)">⭐⭐</div><div class="ch" data-v="3" onclick="pRed(this)">⭐⭐⭐</div><div class="ch" data-v="4" onclick="pRed(this)">⭐⭐⭐⭐</div><div class="ch" data-v="5" onclick="pRed(this)">⭐⭐⭐⭐⭐</div></div></div>
+<div class="fg"><label>Photos</label>
+  <input type="file" id="edPhotos" accept="image/*" multiple style="display:none" onchange="previewEditPhotos(this.files)">
+  <button class="btn-g" onclick="document.getElementById('edPhotos').click()" style="width:100%">📷 Add Photos</button>
+  <div id="edPhotoPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"></div>
+</div>
+<div class="fg"><label>Trim End Time</label>
+  <div style="font-size:9px;color:var(--t4);margin-bottom:4px">Remove data after this time (e.g. if you forgot to stop recording)</div>
+  <input class="fi" id="edTrim" type="datetime-local">
+</div>
+<button class="btn-p" onclick="saveEdit()" style="margin-top:6px">💾 Save Changes</button>
+<button class="btn-d" onclick="closeOv('ovEdit')">Cancel</button>
+</div></div>
 </div>
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v23';
+const APP_VERSION='v25';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -953,7 +992,7 @@ function bootApp(){
     const badge=document.createElement('span');badge.id='guestBadge';badge.style.cssText='margin-left:6px;font-size:8px;color:var(--amb);font-family:var(--fm)';badge.textContent='GUEST';gpsArea.appendChild(badge);
   }
 }
-function fillSel(){['cRes','svR'].forEach(id=>{const s=document.getElementById(id);RS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.nm+' — '+r.rg;s.appendChild(o)})})}
+function fillSel(){['cRes','svR','edR'].forEach(id=>{const s=document.getElementById(id);if(!s)return;RS.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.nm+' — '+r.rg;s.appendChild(o)});const c=document.createElement('option');c.value='_custom';c.textContent='✏️ Custom / Backcountry...';s.appendChild(c)})}
 function applyCfg(){document.getElementById('cName').value=cfg.name||'';document.getElementById('cBio').value=cfg.bio||'';document.getElementById('cRes').value=cfg.homeResort||'';if(cfg.unit==='imperial'){document.getElementById('uM').classList.remove('on');document.getElementById('uI').classList.add('on')}}
 
 /* ═══ MAP ═══ */
@@ -1029,8 +1068,8 @@ function onPos(pos){
   if(tk.pos.length>0){
     const p=tk.pos[tk.pos.length-1];
     segDist=hav(p.lat,p.lng,pt.lat,pt.lng);
-    // Skip duplicate/jitter positions (less than 2m moved)
-    if(segDist<0.002&&pt.t-p.t<5000)return;
+    // Skip GPS jitter (less than 3m moved within 8 seconds = standing still)
+    if(segDist<0.003&&pt.t-p.t<8000)return;
     tk.dist+=segDist;
   }
   // Speed — use GPS speed if available, otherwise calculate from distance/time
@@ -1039,9 +1078,11 @@ function onPos(pos){
     sK=pt.spd*3.6; // m/s → km/h
   }else if(tk.pos.length>0){
     const p=tk.pos[tk.pos.length-1];
-    const dt=(pt.t-p.t)/1000; // seconds
-    if(dt>0&&dt<30){sK=(segDist/dt)*3600} // km/h from distance
+    const dt=(pt.t-p.t)/1000;
+    if(dt>0&&dt<30){sK=(segDist/dt)*3600}
   }
+  // Zero out phantom speed from GPS jitter (below 3 km/h = standing still)
+  if(sK<3)sK=0;
   tk.spd.push(sK);
   if(sK>tk.maxSpd)tk.maxSpd=sK;
   // Elevation tracking (only if altitude is available)
@@ -1102,20 +1143,23 @@ function drawElev(){const cv=document.getElementById('eCvs'),cx=cv.getContext('2
 
 /* ═══ SAVE / VIEW / DELETE ═══ */
 function tc(el){el.classList.toggle('on')}function pR(el){document.querySelectorAll('#rtC .ch').forEach(c=>c.classList.remove('on'));el.classList.add('on')}
-async function saveSess(){const sn=[...document.querySelectorAll('#snC .ch.on')].map(c=>c.dataset.v),wx=[...document.querySelectorAll('#wxC .ch.on')].map(c=>c.dataset.v),re=document.querySelector('#rtC .ch.on'),avg=tk.spd.length?tk.spd.reduce((a,b)=>a+b,0)/tk.spd.length:0;const run={id:Date.now().toString(),name:document.getElementById('svN').value||'Unnamed',resort:document.getElementById('svR').value,date:new Date().toISOString(),dur:tk.elapsed,dist:tk.dist,maxSpd:tk.maxSpd,avgSpd:avg,eDrop:tk.eDrop,runs:tk.nR,runDetails:tk.runDetails,sn,wx,notes:document.getElementById('svNo').value,rating:re?parseInt(re.dataset.v):0,trace:tk.pos.length>400?tk.pos.filter((_,i)=>i%Math.ceil(tk.pos.length/400)===0):tk.pos};
+async function saveSess(){const sn=[...document.querySelectorAll('#snC .ch.on')].map(c=>c.dataset.v),wx=[...document.querySelectorAll('#wxC .ch.on')].map(c=>c.dataset.v),re=document.querySelector('#rtC .ch.on'),avg=tk.spd.length?tk.spd.reduce((a,b)=>a+b,0)/tk.spd.length:0;
+const resortVal=document.getElementById('svR').value;
+const customRes=document.getElementById('svCustomRes').value.trim();
+const run={id:Date.now().toString(),name:document.getElementById('svN').value||'Unnamed',resort:resortVal==='_custom'?'_custom':resortVal,customResort:resortVal==='_custom'?customRes:'',date:new Date().toISOString(),dur:tk.elapsed,dist:tk.dist,maxSpd:tk.maxSpd,avgSpd:avg,eDrop:tk.eDrop,runs:tk.nR,runDetails:tk.runDetails,sn,wx,notes:document.getElementById('svNo').value,rating:re?parseInt(re.dataset.v):0,photos:pendingPhotos||[],trace:tk.pos.length>400?tk.pos.filter((_,i)=>i%Math.ceil(tk.pos.length/400)===0):tk.pos};
 runs.unshift(run);
 await saveS();
 // Publish to community if checked
 const shouldShare=document.getElementById('svShare').checked;
 if(shouldShare){try{await publishActivity(run);console.log('Activity published:',run.id)}catch(e){console.warn('Failed to publish activity:',e)}}
-closeOv('ovSave');clrChips();renderRuns();updateProfile();renderBadges();
+closeOv('ovSave');clrChips();pendingPhotos=[];document.getElementById('svPhotoPreview').innerHTML='';renderRuns();updateProfile();renderBadges();
 // Navigate to runs tab so user sees their saved run immediately
 go('runs');
 // Wait a tick then refresh community
 setTimeout(async()=>{await refreshComm()},300);
 // Show confirmation
 const t=document.getElementById('lapToast');t.innerHTML='✅ Session Saved!';t.classList.add('show');setTimeout(()=>{t.classList.remove('show');t.innerHTML='🔄 RUN #<span id="lapNum">1</span>'},1500)}
-function discSess(){closeOv('ovSave');clrChips()}function clrChips(){document.querySelectorAll('#snC .ch,#wxC .ch,#rtC .ch').forEach(c=>c.classList.remove('on'))}
+function discSess(){closeOv('ovSave');clrChips();pendingPhotos=[];document.getElementById('svPhotoPreview').innerHTML=''}function clrChips(){document.querySelectorAll('#snC .ch,#wxC .ch,#rtC .ch').forEach(c=>c.classList.remove('on'))}
 function renderRuns(){const el=document.getElementById('rnList');
 // Update nav badge
 const navRunsBtn=document.querySelector('[data-p="runs"]');
@@ -1123,27 +1167,36 @@ if(navRunsBtn&&runs.length)navRunsBtn.innerHTML=navRunsBtn.querySelector('svg').
 if(!runs.length){el.innerHTML='<div class="empty-st"><div class="es-i">⛷️</div><p>No runs yet.<br>Start a session on the Track tab!</p></div>';return}
 const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';
 el.innerHTML=`<div style="font-size:10px;color:var(--ice);font-family:var(--fm);margin-bottom:8px">${runs.length} SESSION${runs.length>1?'S':''} RECORDED</div>`+runs.map(r=>{
-const res=RS.find(x=>x.id===r.resort);
+const resNm=getResortName(r);
 const tags=[...(r.sn||[]),...(r.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing','icy'].includes(t)?'sn':t==='warm'?'wr':'';return`<span class="tg ${c}">${t}</span>`}).join('');
 const esc=s=>s?s.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):'';
-return`<div class="rc" onclick="viewR('${r.id}')"><div class="rc-top"><div><h4>${esc(r.name)} ${r.rating?'⭐'.repeat(r.rating):''}</h4>${res?`<div class="rc-res">${res.nm}</div>`:''}</div><div class="rc-dt">${new Date(r.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><div class="rc-row"><div class="rc-s"><div class="rv">${f(r.dist).toFixed(1)}${ud}</div><div class="rl">Dist</div></div><div class="rc-s"><div class="rv">${f(r.maxSpd).toFixed(0)}${us}</div><div class="rl">Top</div></div><div class="rc-s"><div class="rv">${r.runs||1}</div><div class="rl">Runs</div></div><div class="rc-s"><div class="rv">${fmtD(r.dur)}</div><div class="rl">Time</div></div></div>${tags?`<div class="rc-tags">${tags}</div>`:''}${r.notes?`<div class="rc-note">"${esc(r.notes)}"</div>`:''}</div>`}).join('')}
+return`<div class="rc" onclick="viewR('${r.id}')"><div class="rc-top"><div><h4>${esc(r.name)} ${r.rating?'⭐'.repeat(r.rating):''}</h4>${resNm?`<div class="rc-res">${resNm}</div>`:''}</div><div class="rc-dt">${new Date(r.date).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div></div><div class="rc-row"><div class="rc-s"><div class="rv">${f(r.dist).toFixed(1)}${ud}</div><div class="rl">Dist</div></div><div class="rc-s"><div class="rv">${f(r.maxSpd).toFixed(0)}${us}</div><div class="rl">Top</div></div><div class="rc-s"><div class="rv">${r.runs||1}</div><div class="rl">Runs</div></div><div class="rc-s"><div class="rv">${fmtD(r.dur)}</div><div class="rl">Time</div></div></div>${tags?`<div class="rc-tags">${tags}</div>`:''}${r.notes?`<div class="rc-note">"${esc(r.notes)}"</div>`:''}</div>`}).join('')}
 let rdMap=null,rdPoly=null;
 function viewR(id){
   const r=runs.find(x=>x.id===id);if(!r)return;
-  const res=RS.find(x=>x.id===r.resort);
+  const resName=getResortFull(r);
   const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';
   const tags=[...(r.sn||[]),...(r.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing','icy'].includes(t)?'sn':t==='warm'?'wr':'';return`<span class="tg ${c}">${t}</span>`}).join('');
   const hasTrace=r.trace&&r.trace.length>2;
+  const hasAltData=hasTrace&&r.trace.some(p=>p.alt!==null&&p.alt!==undefined);
+  const hasSpdData=hasTrace&&r.trace.some(p=>p.spd!==null&&p.spd!==undefined&&p.spd>0);
   const dateStr=new Date(r.date).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const timeStr=new Date(r.date).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const photos=(r.photos||[]);
   document.getElementById('runDetailContent').innerHTML=`
     <div class="rd-back" onclick="go('runs')">← Back to Runs</div>
-    <div class="rd-title">${r.name}</div>
-    ${res?`<div class="rd-resort">📍 ${res.nm} — ${res.rg}</div>`:''}
-    <div class="rd-date">${dateStr} · ${timeStr}</div>
-    ${r.rating?`<div class="rd-rating">${'⭐'.repeat(r.rating)}</div>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div class="rd-title">${r.name}</div>
+        ${resName?`<div class="rd-resort">📍 ${resName}</div>`:''}
+        <div class="rd-date">${dateStr} · ${timeStr}</div>
+        ${r.rating?`<div class="rd-rating">${'⭐'.repeat(r.rating)}</div>`:''}
+      </div>
+      <button onclick="openEditRun('${r.id}')" style="background:var(--bg3);border:1px solid var(--bd2);border-radius:10px;padding:8px 12px;color:var(--ice);font-size:11px;font-weight:600;cursor:pointer;font-family:'Geologica'">✏️ Edit</button>
+    </div>
     ${hasTrace?`<div class="rd-minimap"><div id="rdMap"></div></div>`:`<div class="rd-no-gps">📡 No GPS data recorded for this session</div>`}
-    ${hasTrace&&r.trace.some(p=>p.alt)?`<div class="rd-elev"><div class="re-lbl">Elevation Profile</div><canvas id="rdElevCanvas"></canvas></div>`:''}
+    ${hasAltData?`<div class="rd-chart"><div class="rc-lbl">Elevation vs Time</div><div class="rc-val">${Math.round(r.eDrop||0)}m drop</div><canvas id="rdElevTimeCanvas"></canvas></div>`:''}
+    ${hasSpdData?`<div class="rd-chart"><div class="rc-lbl">Speed vs Time</div><div class="rc-val">${f(r.maxSpd).toFixed(0)}${us} max</div><canvas id="rdSpeedCanvas"></canvas></div>`:''}
     <div class="rd-section-title">Session Stats</div>
     <div class="sg">
       <div class="sx hl"><div class="si">📏</div><div class="sv">${f(r.dist).toFixed(2)}${ud}</div><div class="sl">Total Distance</div></div>
@@ -1154,16 +1207,17 @@ function viewR(id){
       <div class="sx"><div class="si">🏔️</div><div class="sv">${Math.round(r.eDrop||0)}m</div><div class="sl">Elevation Drop</div></div>
     </div>
     ${(r.runDetails&&r.runDetails.length)?`<div class="rd-section-title">Run Breakdown</div>${r.runDetails.map((rd,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg3);border:1px solid var(--bd1);border-radius:10px;margin-bottom:4px;font-size:11px"><span style="font-family:var(--fm);color:var(--ice);font-weight:700;min-width:18px">#${i+1}</span>${rd.manual?'<span style="color:var(--t3)">Manual mark</span>':`<span style="color:var(--t2)">⬆ ${rd.peak}m → ⬇ ${rd.valley}m</span><span style="font-family:var(--fm);color:var(--ice-b);font-weight:600;margin-left:auto">${rd.drop}m drop</span>`}</div>`).join('')}`:''}
+    ${photos.length?`<div class="rd-section-title">Photos</div><div class="rd-photos">${photos.map(p=>`<img src="${p}" class="rd-photo" onclick="showFullPhoto('${p.replace(/'/g,"\\'")}')">`).join('')}</div>`:''}
     ${tags?`<div class="rd-section-title">Conditions</div><div class="rc-tags" style="margin-bottom:4px">${tags}</div>`:''}
     ${r.notes?`<div class="rd-section-title">Notes</div><div style="font-size:12px;color:var(--t2);line-height:1.6;padding:10px 12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bd1)">"${r.notes}"</div>`:''}
     ${hasTrace?`<button class="btn-g" onclick="showTraceOnMain('${r.id}')" style="margin-top:14px">🗺️ View Full Track on Map</button>`:''}
     <button class="btn-d" onclick="delR('${r.id}')">Delete This Session</button>
   `;
-  // Navigate to the detail page
+  // Navigate to detail page
   document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
   document.getElementById('pg-rundetail').classList.add('on');
   document.querySelectorAll('.nav-b').forEach(b=>b.classList.toggle('on',b.dataset.p==='runs'));
-  // Init mini-map after DOM renders
+  // Init mini-map
   if(hasTrace){
     setTimeout(()=>{
       if(rdMap){rdMap.remove();rdMap=null}
@@ -1172,29 +1226,21 @@ function viewR(id){
       L.tileLayer(TL.gmaps.url,{maxZoom:19,subdomains:'0123'}).addTo(rdMap);
       const latlngs=r.trace.map(p=>[p.lat,p.lng]);
       rdPoly=L.polyline(latlngs,{color:'#F59E0B',weight:3,opacity:.9}).addTo(rdMap);
-      // Start/end markers
       if(latlngs.length>0){
         L.circleMarker(latlngs[0],{radius:5,color:'#22C55E',fillColor:'#22C55E',fillOpacity:1,weight:2}).addTo(rdMap).bindPopup('Start');
         L.circleMarker(latlngs[latlngs.length-1],{radius:5,color:'#EF4444',fillColor:'#EF4444',fillOpacity:1,weight:2}).addTo(rdMap).bindPopup('End');
       }
       rdMap.fitBounds(rdPoly.getBounds(),{padding:[20,20]});
     },200);
-    // Draw elevation profile
-    setTimeout(()=>{
-      const elevPts=r.trace.filter(p=>p.alt).map(p=>p.alt);
-      if(elevPts.length<2)return;
-      const cv=document.getElementById('rdElevCanvas');if(!cv)return;
-      const cx=cv.getContext('2d'),w=cv.offsetWidth,h=cv.offsetHeight;
-      cv.width=w*2;cv.height=h*2;cx.scale(2,2);
-      const mn=Math.min(...elevPts),mx=Math.max(...elevPts),rg=mx-mn||1;
-      cx.beginPath();cx.moveTo(0,h);
-      elevPts.forEach((v,i)=>{cx.lineTo((i/(elevPts.length-1))*w,h-((v-mn)/rg)*(h-6)-3)});
-      cx.lineTo(w,h);cx.closePath();
-      const g=cx.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(245,158,11,.3)');g.addColorStop(1,'rgba(245,158,11,.02)');
-      cx.fillStyle=g;cx.fill();
-      cx.beginPath();elevPts.forEach((v,i)=>{const x=(i/(elevPts.length-1))*w,y=h-((v-mn)/rg)*(h-6)-3;i===0?cx.moveTo(x,y):cx.lineTo(x,y)});
-      cx.strokeStyle='#F59E0B';cx.lineWidth=1.5;cx.stroke();
-    },300);
+  }
+  // Draw charts
+  if(hasAltData){
+    const elevPts=r.trace.filter(p=>p.alt!==null&&p.alt!==undefined).map(p=>p.alt);
+    drawTimeChart('rdElevTimeCanvas',elevPts,'rgba(245,158,11,1)','Elevation','m');
+  }
+  if(hasSpdData){
+    const spdPts=r.trace.map(p=>(p.spd||0)*3.6);
+    drawTimeChart('rdSpeedCanvas',spdPts,'rgba(56,189,248,1)','Speed','km/h');
   }
 }
 function showTraceOnMain(id){const r=runs.find(x=>x.id===id);if(!r?.trace||!map)return;go('map');setTimeout(()=>{if(trkPoly)map.removeLayer(trkPoly);trkPoly=L.polyline(r.trace.map(p=>[p.lat,p.lng]),{color:'#F59E0B',weight:3,opacity:.9}).addTo(map);map.fitBounds(trkPoly.getBounds(),{padding:[30,30]})},300)}
@@ -1202,6 +1248,142 @@ async function delR(id){if(!confirm('Delete this session?'))return;runs=runs.fil
 // Also delete from Firebase
 if(fbDb&&!isGuest){try{await fbDb.ref('activities/'+id).remove()}catch(e){console.log('Firebase delete skipped')}}
 go('runs');renderRuns();updateProfile();renderBadges()}
+
+/* ═══ PHOTOS ═══ */
+let pendingPhotos=[],editPhotos=[];
+function resizePhoto(file,maxW=800){
+  return new Promise((resolve)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const cv=document.createElement('canvas');
+        let w=img.width,h=img.height;
+        if(w>maxW){h=Math.round(h*(maxW/w));w=maxW}
+        cv.width=w;cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(cv.toDataURL('image/jpeg',0.7));
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function previewPhotos(files){
+  const el=document.getElementById('svPhotoPreview');
+  for(const f of files){
+    if(pendingPhotos.length>=6)break;
+    const data=await resizePhoto(f);
+    pendingPhotos.push(data);
+  }
+  renderPhotoPreview(el,pendingPhotos,i=>{pendingPhotos.splice(i,1);renderPhotoPreview(el,pendingPhotos)});
+}
+async function previewEditPhotos(files){
+  const el=document.getElementById('edPhotoPreview');
+  for(const f of files){
+    if(editPhotos.length>=6)break;
+    const data=await resizePhoto(f);
+    editPhotos.push(data);
+  }
+  renderPhotoPreview(el,editPhotos,i=>{editPhotos.splice(i,1);renderPhotoPreview(el,editPhotos)});
+}
+function renderPhotoPreview(el,arr,onRemove){
+  el.innerHTML=arr.map((p,i)=>`<div class="photo-thumb-wrap"><img src="${p}" class="photo-thumb"><div class="photo-thumb-x" onclick="event.stopPropagation();(${onRemove.toString()})(${i})">✕</div></div>`).join('');
+}
+function showFullPhoto(src){
+  const d=document.createElement('div');d.className='rd-photo-full';
+  d.innerHTML=`<img src="${src}">`;d.onclick=()=>d.remove();
+  document.body.appendChild(d);
+}
+
+/* ═══ CHARTS ═══ */
+function drawTimeChart(canvasId,data,color,label,unit){
+  setTimeout(()=>{
+    const cv=document.getElementById(canvasId);if(!cv||data.length<2)return;
+    const cx=cv.getContext('2d'),w=cv.offsetWidth,h=cv.offsetHeight;
+    cv.width=w*2;cv.height=h*2;cx.scale(2,2);
+    const mn=Math.min(...data),mx=Math.max(...data),rg=mx-mn||1;
+    // Fill
+    cx.beginPath();cx.moveTo(0,h);
+    data.forEach((v,i)=>{cx.lineTo((i/(data.length-1))*w,h-((v-mn)/rg)*(h-14)-3)});
+    cx.lineTo(w,h);cx.closePath();
+    const g=cx.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,color.replace('1)','0.25)'));g.addColorStop(1,color.replace('1)','0.02)'));
+    cx.fillStyle=g;cx.fill();
+    // Line
+    cx.beginPath();
+    data.forEach((v,i)=>{const x=(i/(data.length-1))*w,y=h-((v-mn)/rg)*(h-14)-3;i===0?cx.moveTo(x,y):cx.lineTo(x,y)});
+    cx.strokeStyle=color;cx.lineWidth=1.5;cx.stroke();
+  },350);
+}
+function getResortName(r){
+  if(r.resort==='_custom')return r.customResort||'Custom';
+  const res=RS.find(x=>x.id===r.resort);
+  return res?res.nm:'Unknown';
+}
+function getResortFull(r){
+  if(r.resort==='_custom')return r.customResort||'Backcountry';
+  const res=RS.find(x=>x.id===r.resort);
+  return res?res.nm+' — '+res.rg:'';
+}
+
+/* ═══ EDIT SESSION ═══ */
+let editRunId=null;
+function pRed(el){document.querySelectorAll('#edRtC .ch').forEach(c=>c.classList.remove('on'));el.classList.add('on')}
+function openEditRun(id){
+  const r=runs.find(x=>x.id===id);if(!r)return;
+  editRunId=id;
+  document.getElementById('edN').value=r.name||'';
+  const sel=document.getElementById('edR');
+  if(r.resort==='_custom'){sel.value='_custom';document.getElementById('edCustomRes').style.display='block';document.getElementById('edCustomRes').value=r.customResort||''}
+  else{sel.value=r.resort||'';document.getElementById('edCustomRes').style.display='none'}
+  sel.onchange=function(){document.getElementById('edCustomRes').style.display=this.value==='_custom'?'block':'none'};
+  document.getElementById('edNo').value=r.notes||'';
+  document.querySelectorAll('#edRtC .ch').forEach(c=>c.classList.toggle('on',parseInt(c.dataset.v)===r.rating));
+  // Photos
+  editPhotos=[...(r.photos||[])];
+  const el=document.getElementById('edPhotoPreview');
+  renderPhotoPreview(el,editPhotos,i=>{editPhotos.splice(i,1);renderPhotoPreview(el,editPhotos,i2=>{editPhotos.splice(i2,1);renderPhotoPreview(el,editPhotos)})});
+  // Trim - set max to session end time
+  const endTime=r.trace?.length?new Date(r.trace[r.trace.length-1].t):new Date(r.date);
+  const startTime=new Date(r.date);
+  document.getElementById('edTrim').value=endTime.toISOString().slice(0,16);
+  document.getElementById('edTrim').min=startTime.toISOString().slice(0,16);
+  document.getElementById('edTrim').max=endTime.toISOString().slice(0,16);
+  openOv('ovEdit');
+}
+async function saveEdit(){
+  const r=runs.find(x=>x.id===editRunId);if(!r)return;
+  r.name=document.getElementById('edN').value||r.name;
+  const resVal=document.getElementById('edR').value;
+  r.resort=resVal==='_custom'?'_custom':resVal;
+  r.customResort=resVal==='_custom'?document.getElementById('edCustomRes').value.trim():'';
+  r.notes=document.getElementById('edNo').value;
+  const re=document.querySelector('#edRtC .ch.on');
+  if(re)r.rating=parseInt(re.dataset.v);
+  r.photos=editPhotos;
+  // Trim session
+  const trimVal=document.getElementById('edTrim').value;
+  if(trimVal&&r.trace?.length){
+    const trimTs=new Date(trimVal).getTime();
+    const origLen=r.trace.length;
+    r.trace=r.trace.filter(p=>p.t<=trimTs);
+    if(r.trace.length<origLen){
+      // Recalculate stats from trimmed trace
+      let dist=0,maxSpd=0,spds=[];
+      for(let i=1;i<r.trace.length;i++){
+        dist+=hav(r.trace[i-1].lat,r.trace[i-1].lng,r.trace[i].lat,r.trace[i].lng);
+        const s=(r.trace[i].spd||0)*3.6;spds.push(s);if(s>maxSpd)maxSpd=s;
+      }
+      r.dist=dist;r.maxSpd=maxSpd;r.avgSpd=spds.length?spds.reduce((a,b)=>a+b,0)/spds.length:0;
+      if(r.trace.length)r.dur=r.trace[r.trace.length-1].t-r.trace[0].t;
+    }
+  }
+  await saveS();
+  closeOv('ovEdit');
+  viewR(editRunId); // Refresh the detail view
+  const t=document.getElementById('lapToast');t.innerHTML='✅ Session Updated!';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);
+}
 
 /* ═══ PROFILE ═══ */
 function updateProfile(){document.getElementById('profAvEmoji').textContent=cfg.avatar||'⛷️';document.getElementById('profName').textContent=cfg.name||'Set Your Name';document.getElementById('profBio').textContent=cfg.bio||'Tap Edit Profile below';const res=RS.find(x=>x.id===cfg.homeResort);document.getElementById('profResort').textContent=res?'📍 '+res.nm:'';const tR=runs.reduce((a,r)=>a+(r.runs||1),0),tD=runs.reduce((a,r)=>a+r.dist,0),tV=runs.reduce((a,r)=>a+(r.eDrop||0),0),tS=Math.max(0,...runs.map(r=>r.maxSpd));const f=v=>cfg.unit==='imperial'?v*.621371:v;document.getElementById('pr-runs').textContent=tR;document.getElementById('pr-dist').textContent=f(tD).toFixed(0);document.getElementById('pr-vert').textContent=Math.round(tV);document.getElementById('pr-top').textContent=f(tS).toFixed(0);
@@ -1259,7 +1441,7 @@ applyCfg();renderRuns();updateProfile();renderBadges()}
 function go(pg){document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));document.getElementById('pg-'+pg).classList.add('on');document.querySelectorAll('.nav-b').forEach(b=>{const m=b.dataset.p===pg;b.classList.toggle('on',m);if(b.dataset.p==='track'&&tracking&&!m)b.classList.add('rec');else if(b.dataset.p==='track'&&!tracking)b.classList.remove('rec')});if(pg==='map'&&map)setTimeout(()=>map.invalidateSize(),100);if(pg==='runs')renderRuns();if(pg==='comm')refreshComm();if(pg==='profile'){updateProfile();renderBadges();initAvPicker()}}
 function openOv(id){document.getElementById(id).classList.add('on');if(id==='ovAvatar')initAvPicker()}
 function closeOv(id){document.getElementById(id).classList.remove('on')}
-document.getElementById('ovSave').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovSave')});
+// Save modal: NO click-outside dismiss — must use Save or Discard buttons
 document.getElementById('ovView').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovView')});
 document.getElementById('ovAvatar').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovAvatar')});
 
