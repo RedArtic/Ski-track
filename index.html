@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=18',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=20',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -337,7 +337,8 @@ textarea.fi{min-height:50px;resize:vertical}
 <div class="t-hint">
   <b>Runs auto-detect</b> via elevation changes<br>
   Ride lift up → ski down → run counted automatically<br>
-  <b>+1</b> → manual run mark · <b>⏹</b> → end & save
+  <b>+1</b> → manual run mark · <b>⏹</b> → end & save<br>
+  <b>💡 Keep SkiTrack visible</b> — screen stays on while tracking
 </div>
 </div></div></div>
 <!-- ═══ WEATHER PAGE ═══ -->
@@ -486,7 +487,7 @@ textarea.fi{min-height:50px;resize:vertical}
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v18';
+const APP_VERSION='v20';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -736,26 +737,41 @@ async function doAuth(){
     if(authIsSignup){
       cred=await fbAuth.createUserWithEmailAndPassword(email,pass);
       if(name)await cred.user.updateProfile({displayName:name});
-      cfg.name=name||email.split('@')[0];
     }else{
       cred=await fbAuth.signInWithEmailAndPassword(email,pass);
-      cfg.name=cred.user.displayName||email.split('@')[0];
     }
-    fbUser=cred.user;cfg.uid=fbUser.uid;isGuest=false;
+    fbUser=cred.user;isGuest=false;
+    // RESET state before loading — prevents data bleed from previous user
+    resetState();
+    cfg.uid=fbUser.uid;
+    cfg.name=fbUser.displayName||name||email.split('@')[0];
+    localStorage.setItem('st-last-uid',cfg.uid);
+    localStorage.removeItem('st-guest');
     document.getElementById('authScreen').classList.remove('on');
     document.getElementById('authScreen').style.display='none';
     await loadS();bootApp();
   }catch(e){
-    const msg=e.code==='auth/email-already-in-use'?'Email already registered — try signing in':e.code==='auth/wrong-password'?'Incorrect password':e.code==='auth/user-not-found'?'No account found — try signing up':e.code==='auth/invalid-email'?'Invalid email address':e.message;
+    const msg=e.code==='auth/email-already-in-use'?'Email already registered — try signing in':e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'?'Incorrect password':e.code==='auth/user-not-found'?'No account found — try signing up':e.code==='auth/invalid-email'?'Invalid email address':e.message;
     errEl.textContent=msg;
   }
 }
 function doGuest(){
+  // RESET state — guests should NOT see previous user's data
+  resetState();
   isGuest=true;
   cfg.uid='guest_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+  cfg.name='Guest';
+  localStorage.setItem('st-guest','true');
+  localStorage.removeItem('st-last-uid');
   document.getElementById('authScreen').classList.remove('on');
   document.getElementById('authScreen').style.display='none';
-  loadS().then(()=>bootApp()).catch(()=>bootApp());
+  // Don't load previous data — guest starts fresh
+  bootApp();
+}
+// Reset all in-memory state to defaults
+function resetState(){
+  cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:''};
+  runs=[];
 }
 
 /* ═══ STATE ═══ */
@@ -769,33 +785,35 @@ const AUTO_RUN_CFG={liftGain:30,runDrop:25,bufSize:5};
 
 /* ═══ LOCAL STORAGE ═══ */
 const hasArtifactStorage=typeof window.storage!=='undefined'&&window.storage?.get;
+function lsKey(base){return base+'-'+cfg.uid} // Scope storage keys by user id
 async function loadS(){
-  // Primary: localStorage (works everywhere)
-  try{const s=localStorage.getItem('st-cfg');if(s)cfg={...cfg,...JSON.parse(s)}}catch(e){}
-  try{const s=localStorage.getItem('st-runs');if(s)runs=JSON.parse(s)}catch(e){}
-  // Secondary: artifact storage (Claude preview only)
-  if(hasArtifactStorage){
-    try{const r=await window.storage.get('st-cfg');if(r?.value)cfg={...cfg,...JSON.parse(r.value)}}catch(e){}
-    try{const r=await window.storage.get('st-runs');if(r?.value){const ar=JSON.parse(r.value);if(ar.length>runs.length)runs=ar}}catch(e){}
-  }
-  if(fbUser)cfg.uid=fbUser.uid;
-  else if(!cfg.uid)cfg.uid='guest_'+Date.now();
-  // If logged in, pull profile from Firebase
+  if(!cfg.uid){console.warn('loadS called without uid');return}
+  // Load THIS user's data from localStorage (scoped by uid)
+  try{const s=localStorage.getItem(lsKey('st-cfg'));if(s){const saved=JSON.parse(s);cfg={...cfg,...saved};cfg.uid=cfg.uid}}catch(e){}
+  try{const s=localStorage.getItem(lsKey('st-runs'));if(s)runs=JSON.parse(s)}catch(e){}
+  // If logged in, pull profile from Firebase (authoritative source)
   if(fbUser&&fbDb){
     try{const snap=await fbDb.ref('profiles/'+cfg.uid).once('value');
       if(snap.val()){const p=snap.val();cfg.name=p.name||cfg.name;cfg.bio=p.bio||cfg.bio;cfg.avatar=p.avatar||cfg.avatar;cfg.homeResort=p.resort||cfg.homeResort}
     }catch(e){console.log('Firebase profile fetch skipped')}
+    // Also load runs from Firebase if local is empty
+    if(runs.length===0){
+      try{const snap=await fbDb.ref('activities').orderByChild('uid').equalTo(cfg.uid).once('value');
+        if(snap.val()){
+          const fbRuns=Object.values(snap.val());
+          // Convert activities back to local run format
+          runs=fbRuns.map(a=>({id:a.runId,name:a.runName,resort:a.resort,date:new Date(a.ts).toISOString(),dur:0,dist:a.dist,maxSpd:a.maxSpd,avgSpd:0,eDrop:a.eDrop||0,runs:a.runs||1,sn:a.sn||[],wx:a.wx||[],notes:a.notes||'',rating:a.rating||0,trace:[]}));
+          console.log('Restored',runs.length,'runs from Firebase');
+        }
+      }catch(e){console.log('Firebase runs fetch skipped')}
+    }
   }
-  console.log('Loaded',runs.length,'runs, user:',cfg.name||cfg.uid);
+  console.log('Loaded',runs.length,'runs for user:',cfg.name||cfg.uid);
 }
 async function saveS(){
-  // Always save to localStorage
-  try{localStorage.setItem('st-cfg',JSON.stringify(cfg));localStorage.setItem('st-runs',JSON.stringify(runs))}catch(e){}
-  // Also save to artifact storage if available
-  if(hasArtifactStorage){
-    try{await window.storage.set('st-cfg',JSON.stringify(cfg))}catch(e){}
-    try{await window.storage.set('st-runs',JSON.stringify(runs))}catch(e){}
-  }
+  if(!cfg.uid)return;
+  // Save to localStorage scoped by uid
+  try{localStorage.setItem(lsKey('st-cfg'),JSON.stringify(cfg));localStorage.setItem(lsKey('st-runs'),JSON.stringify(runs))}catch(e){}
   // Sync profile to Firebase
   await publishProfile();
 }
@@ -873,49 +891,34 @@ window.addEventListener('DOMContentLoaded',async()=>{
     setTimeout(async()=>{
       console.log('Splash hidden, checking auth...');
       document.getElementById('splash').style.display='none';
-      // Check returning guest FIRST (fastest path)
-      let wasGuest=false;
-      try{wasGuest=localStorage.getItem('st-guest')==='true';console.log('Was guest: '+wasGuest)}catch(e){console.log('localStorage error: '+e.message)}
-      if(wasGuest){
-        console.log('Returning guest → boot');
-        isGuest=true;
-        try{await loadS()}catch(e){console.log('loadS error: '+e.message)}
-        bootApp();
-        return;
-      }
-      // Check Firebase
-      console.log('fbAuth exists: '+!!fbAuth);
+      // Always check Firebase auth — it's the source of truth
       if(fbAuth){
         let resolved=false;
-        // Force auth screen visible after 1.5s no matter what
         const fallback=setTimeout(()=>{
-          if(!resolved){console.log('1.5s fallback → show auth');showAuth()}
-        },1500);
+          if(!resolved){showAuth()}
+        },2000);
         try{
-          console.log('Listening for onAuthStateChanged...');
           fbAuth.onAuthStateChanged(async(user)=>{
-            console.log('onAuthStateChanged fired, user: '+(user?user.email:'null'));
-            if(resolved){console.log('Already resolved, skipping');return}
+            if(resolved)return;
             resolved=true;clearTimeout(fallback);
             if(user){
-              fbUser=user;cfg.uid=user.uid;cfg.name=user.displayName||cfg.name;isGuest=false;
-              console.log('Signed in user → loading data...');
-              try{await loadS()}catch(e){console.log('loadS error: '+e.message)}
-              console.log('Booting app...');
+              // Returning signed-in user — reset state, then load THEIR data
+              fbUser=user;isGuest=false;
+              resetState();
+              cfg.uid=user.uid;
+              cfg.name=user.displayName||'';
+              try{await loadS()}catch(e){}
               bootApp();
             }else{
-              console.log('No user session → show auth');
+              // No active session — always show auth (no auto-guest)
               showAuth();
             }
           });
-          console.log('onAuthStateChanged listener registered');
         }catch(e){
-          console.log('Auth listener error: '+e.message);
           resolved=true;clearTimeout(fallback);
           showAuth();
         }
       }else{
-        console.log('No Firebase → show auth');
         showAuth();
       }
     },400);
@@ -923,18 +926,17 @@ window.addEventListener('DOMContentLoaded',async()=>{
 });
 console.log('Init code registered');
 function bootApp(){
-  console.log('bootApp called, guest='+isGuest);
-  // Hide auth screen if it was showing
+  console.log('bootApp: user='+cfg.name+' uid='+cfg.uid+' guest='+isGuest);
+  // Hide auth screen
   document.getElementById('authScreen').classList.remove('on');
   document.getElementById('authScreen').style.display='none';
-  if(isGuest)try{localStorage.setItem('st-guest','true')}catch(e){}
   document.getElementById('hdr').style.display='flex';
   document.getElementById('pagesWrap').style.display='';
   document.getElementById('navBar').style.display='flex';
   initMap();initGPS();fillSel();applyCfg();
   renderRuns();updateProfile();renderBadges();refreshComm();
   setWxResort(RS.find(x=>x.id===cfg.homeResort)||RS[0]);
-  // Show login status
+  // Show login status badge
   const gpsArea=document.querySelector('.gps-b');
   if(isGuest&&gpsArea){
     const badge=document.createElement('span');badge.style.cssText='margin-left:6px;font-size:8px;color:var(--amb);font-family:var(--fm)';badge.textContent='GUEST';gpsArea.appendChild(badge);
@@ -974,10 +976,25 @@ function setGPS(s,t){document.getElementById('gpsDot').className='gps-d'+(s==='o
 
 /* ═══ TRACKING ═══ */
 function goTrk(){if(!tracking)startTrk();else if(paused)resumeTrk();else pauseTrk()}
-function startTrk(){tracking=true;paused=false;tk=rTk();tk.t0=Date.now();tk.resumeAt=Date.now();tk.elapsed=0;elevD=[];setTrkUI('live');document.getElementById('tv-run').textContent='0';document.getElementById('tv-state').textContent='Waiting for GPS...';if(navigator.geolocation){try{watchId=navigator.geolocation.watchPosition(onPos,e=>console.warn('GPS:',e.message),{enableHighAccuracy:true,maximumAge:2000,timeout:10000})}catch(e){}}clockInt=setInterval(tickClk,100);if(map)trkPoly=L.polyline([],{color:'#38BDF8',weight:3,opacity:.85}).addTo(map);document.getElementById('eBox').style.display='block'}
-function pauseTrk(){paused=true;tk.elapsed+=(Date.now()-tk.resumeAt);const g=document.getElementById('bGo');g.textContent='▶';g.className='br br-go psd';document.getElementById('tHero').className='t-hero paused';document.getElementById('tLbl').textContent='Paused';document.getElementById('tLbl').className='t-lbl paused'}
-function resumeTrk(){paused=false;tk.resumeAt=Date.now();const g=document.getElementById('bGo');g.textContent='⏸';g.className='br br-go rec';document.getElementById('tHero').className='t-hero live';document.getElementById('tLbl').textContent='Recording';document.getElementById('tLbl').className='t-lbl live'}
-function stopTrk(){if(!tracking)return;if(!paused)tk.elapsed+=(Date.now()-tk.resumeAt);tracking=false;paused=false;if(watchId)navigator.geolocation.clearWatch(watchId);if(clockInt)clearInterval(clockInt);setTrkUI('done');document.getElementById('svN').value='Session '+new Date().toLocaleDateString();openOv('ovSave')}
+let wakeLock=null;
+async function acquireWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock=await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release',()=>{console.log('Wake lock released')});
+      console.log('Wake lock acquired — screen will stay on');
+    }
+  }catch(e){console.log('Wake lock unavailable:',e.message)}
+}
+function releaseWakeLock(){if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null}}
+// Re-acquire wake lock when app becomes visible again (browser releases it on tab switch)
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&tracking&&!paused)acquireWakeLock()});
+function startTrk(){tracking=true;paused=false;tk=rTk();tk.t0=Date.now();tk.resumeAt=Date.now();tk.elapsed=0;elevD=[];setTrkUI('live');document.getElementById('tv-run').textContent='0';document.getElementById('tv-state').textContent='Waiting for GPS...';
+acquireWakeLock();
+if(navigator.geolocation){try{watchId=navigator.geolocation.watchPosition(onPos,e=>{console.warn('GPS:',e.message);document.getElementById('tv-state').textContent='⚠️ GPS error: '+e.message},{enableHighAccuracy:true,maximumAge:2000,timeout:15000})}catch(e){}}clockInt=setInterval(tickClk,100);if(map)trkPoly=L.polyline([],{color:'#38BDF8',weight:3,opacity:.85}).addTo(map);document.getElementById('eBox').style.display='block'}
+function pauseTrk(){paused=true;tk.elapsed+=(Date.now()-tk.resumeAt);releaseWakeLock();const g=document.getElementById('bGo');g.textContent='▶';g.className='br br-go psd';document.getElementById('tHero').className='t-hero paused';document.getElementById('tLbl').textContent='Paused';document.getElementById('tLbl').className='t-lbl paused'}
+function resumeTrk(){paused=false;tk.resumeAt=Date.now();acquireWakeLock();const g=document.getElementById('bGo');g.textContent='⏸';g.className='br br-go rec';document.getElementById('tHero').className='t-hero live';document.getElementById('tLbl').textContent='Recording';document.getElementById('tLbl').className='t-lbl live'}
+function stopTrk(){if(!tracking)return;if(!paused)tk.elapsed+=(Date.now()-tk.resumeAt);tracking=false;paused=false;if(watchId)navigator.geolocation.clearWatch(watchId);if(clockInt)clearInterval(clockInt);releaseWakeLock();setTrkUI('done');document.getElementById('svN').value='Session '+new Date().toLocaleDateString();try{localStorage.removeItem('st-tracking-backup')}catch(e){}openOv('ovSave')}
 function mLap(){
   if(!tracking)return;
   tk.nR++;tk.runIdx.push(tk.pos.length);
@@ -992,11 +1009,32 @@ function setTrkUI(s){const g=document.getElementById('bGo');document.getElementB
 function onPos(pos){
   if(!tracking||paused)return;
   const c=pos.coords;
-  const pt={lat:c.latitude,lng:c.longitude,alt:c.altitude||0,spd:c.speed||0,t:Date.now()};
+  const hasAlt=c.altitude!==null&&c.altitude!==undefined&&!isNaN(c.altitude);
+  const pt={lat:c.latitude,lng:c.longitude,alt:hasAlt?c.altitude:null,spd:c.speed,t:Date.now(),acc:c.accuracy||999};
+  // Skip wildly inaccurate readings (>100m accuracy)
+  if(pt.acc>100)return;
   // Distance
-  if(tk.pos.length>0){const p=tk.pos[tk.pos.length-1];tk.dist+=hav(p.lat,p.lng,pt.lat,pt.lng)}
-  // Elevation
-  if(pt.alt){
+  let segDist=0;
+  if(tk.pos.length>0){
+    const p=tk.pos[tk.pos.length-1];
+    segDist=hav(p.lat,p.lng,pt.lat,pt.lng);
+    // Skip duplicate/jitter positions (less than 2m moved)
+    if(segDist<0.002&&pt.t-p.t<5000)return;
+    tk.dist+=segDist;
+  }
+  // Speed — use GPS speed if available, otherwise calculate from distance/time
+  let sK=0;
+  if(pt.spd!==null&&pt.spd!==undefined&&pt.spd>=0){
+    sK=pt.spd*3.6; // m/s → km/h
+  }else if(tk.pos.length>0){
+    const p=tk.pos[tk.pos.length-1];
+    const dt=(pt.t-p.t)/1000; // seconds
+    if(dt>0&&dt<30){sK=(segDist/dt)*3600} // km/h from distance
+  }
+  tk.spd.push(sK);
+  if(sK>tk.maxSpd)tk.maxSpd=sK;
+  // Elevation tracking (only if altitude is available)
+  if(hasAlt){
     if(tk.eStart===null)tk.eStart=pt.alt;
     const drop=tk.eStart-pt.alt;if(drop>tk.eDrop)tk.eDrop=drop;
     elevD.push(pt.alt);drawElev();
@@ -1012,28 +1050,27 @@ function onPos(pos){
     }else if(tk.altState==='descending'){
       if(sa<tk.valleyAlt)tk.valleyAlt=sa;
       if(sa-tk.valleyAlt>=AUTO_RUN_CFG.liftGain){
-        // Run completed!
         tk.nR++;
         const rd=Math.round(tk.peakAlt-tk.valleyAlt);
         tk.runDetails.push({peak:Math.round(tk.peakAlt),valley:Math.round(tk.valleyAlt),drop:rd,idx:tk.pos.length});
         tk.runIdx.push(tk.pos.length);
         document.getElementById('tv-run').textContent=tk.nR;
-        // Toast
         const toast=document.getElementById('lapToast');
         toast.innerHTML='⛷️ RUN #'+tk.nR+' — '+rd+'m drop';
         toast.classList.add('show');
         setTimeout(()=>toast.classList.remove('show'),1800);
-        // Reset cycle
         tk.altState='ascending';tk.peakAlt=sa;tk.valleyAlt=sa;
       }
     }
-    // Update state indicator
     const stEl=document.getElementById('tv-state');
     if(stEl)stEl.textContent=tk.altState==='ascending'?'🚡 Lift':tk.altState==='descending'?'⛷️ Skiing':'—';
+  }else{
+    // No altitude — show warning
+    const stEl=document.getElementById('tv-state');
+    if(stEl&&tk.pos.length<3)stEl.textContent='📡 No altitude — runs won\'t auto-detect';
   }
-  // Speed
-  const sK=(pt.spd||0)*3.6;tk.spd.push(sK);if(sK>tk.maxSpd)tk.maxSpd=sK;
   tk.pos.push(pt);
+  // Update UI
   const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v;
   document.getElementById('tv-spd').textContent=f(sK).toFixed(1);
   document.getElementById('tv-dst').textContent=f(tk.dist).toFixed(2);
@@ -1042,8 +1079,12 @@ function onPos(pos){
   const avg=tk.spd.length?tk.spd.reduce((a,b)=>a+b,0)/tk.spd.length:0;
   document.getElementById('tv-avg').textContent=f(avg).toFixed(1);
   document.getElementById('tv-run').textContent=tk.nR;
+  // GPS point counter (visible proof tracking is working)
+  document.getElementById('tv-state').textContent+=' · '+tk.pos.length+' pts';
   placeU(c);if(trkPoly)trkPoly.addLatLng([c.latitude,c.longitude]);
   userPos={lat:c.latitude,lng:c.longitude};
+  // Auto-save every 30 points (crash protection)
+  if(tk.pos.length%30===0){try{localStorage.setItem('st-tracking-backup',JSON.stringify({pos:tk.pos.slice(-200),dist:tk.dist,maxSpd:tk.maxSpd,eDrop:tk.eDrop,nR:tk.nR,elapsed:tk.elapsed+(Date.now()-tk.resumeAt),t:Date.now()}))}catch(e){}}
 }
 function tickClk(){let ms=paused?tk.elapsed:tk.elapsed+(Date.now()-tk.resumeAt);const h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000),s=Math.floor((ms%60000)/1000),f=Math.floor((ms%1000)/10);let d=h>0?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;document.getElementById('tClk').innerHTML=d+`<span class="fr">.${String(f).padStart(2,'0')}</span>`}
 function drawElev(){const cv=document.getElementById('eCvs'),cx=cv.getContext('2d'),w=cv.offsetWidth,h=cv.offsetHeight;cv.width=w*2;cv.height=h*2;cx.scale(2,2);if(elevD.length<2)return;const mn=Math.min(...elevD),mx=Math.max(...elevD),rg=mx-mn||1;cx.clearRect(0,0,w,h);cx.beginPath();cx.moveTo(0,h);elevD.forEach((v,i)=>{cx.lineTo((i/(elevD.length-1))*w,h-((v-mn)/rg)*(h-6)-3)});cx.lineTo(w,h);cx.closePath();const g=cx.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(56,189,248,.25)');g.addColorStop(1,'rgba(56,189,248,.01)');cx.fillStyle=g;cx.fill();cx.beginPath();elevD.forEach((v,i)=>{const x=(i/(elevD.length-1))*w,y=h-((v-mn)/rg)*(h-6)-3;i===0?cx.moveTo(x,y):cx.lineTo(x,y)});cx.strokeStyle='#38BDF8';cx.lineWidth=1.5;cx.stroke()}
@@ -1146,7 +1187,10 @@ function viewR(id){
   }
 }
 function showTraceOnMain(id){const r=runs.find(x=>x.id===id);if(!r?.trace||!map)return;go('map');setTimeout(()=>{if(trkPoly)map.removeLayer(trkPoly);trkPoly=L.polyline(r.trace.map(p=>[p.lat,p.lng]),{color:'#F59E0B',weight:3,opacity:.9}).addTo(map);map.fitBounds(trkPoly.getBounds(),{padding:[30,30]})},300)}
-async function delR(id){if(!confirm('Delete this session?'))return;runs=runs.filter(r=>r.id!==id);await saveS();go('runs');renderRuns();updateProfile();renderBadges()}
+async function delR(id){if(!confirm('Delete this session?'))return;runs=runs.filter(r=>r.id!==id);await saveS();
+// Also delete from Firebase
+if(fbDb&&!isGuest){try{await fbDb.ref('activities/'+id).remove()}catch(e){console.log('Firebase delete skipped')}}
+go('runs');renderRuns();updateProfile();renderBadges()}
 
 /* ═══ PROFILE ═══ */
 function updateProfile(){document.getElementById('profAvEmoji').textContent=cfg.avatar||'⛷️';document.getElementById('profName').textContent=cfg.name||'Set Your Name';document.getElementById('profBio').textContent=cfg.bio||'Tap Edit Profile below';const res=RS.find(x=>x.id===cfg.homeResort);document.getElementById('profResort').textContent=res?'📍 '+res.nm:'';const tR=runs.reduce((a,r)=>a+(r.runs||1),0),tD=runs.reduce((a,r)=>a+r.dist,0),tV=runs.reduce((a,r)=>a+(r.eDrop||0),0),tS=Math.max(0,...runs.map(r=>r.maxSpd));const f=v=>cfg.unit==='imperial'?v*.621371:v;document.getElementById('pr-runs').textContent=tR;document.getElementById('pr-dist').textContent=f(tD).toFixed(0);document.getElementById('pr-vert').textContent=Math.round(tV);document.getElementById('pr-top').textContent=f(tS).toFixed(0);
@@ -1156,10 +1200,12 @@ function updateProfile(){document.getElementById('profAvEmoji').textContent=cfg.
   else{as.textContent='⚠️ Guest mode — data stays on this device only';so.style.display='none';si.style.display='block'}
 }
 async function doSignOut(){
-  if(!confirm('Sign out? Your local data will be kept.'))return;
+  if(!confirm('Sign out?'))return;
   try{await fbAuth.signOut()}catch(e){}
-  fbUser=null;isGuest=true;
-  try{localStorage.removeItem('st-guest')}catch(e){}
+  fbUser=null;isGuest=false;
+  resetState();
+  localStorage.removeItem('st-guest');
+  localStorage.removeItem('st-last-uid');
   location.reload();
 }
 function renderBadges(){document.getElementById('badgesGrid').innerHTML=BADGES.map(b=>{const e=b.ck(runs);return`<div class="badge ${e?'earned':''}"><span class="b-ic">${e?b.ic:'🔒'}</span><span class="b-nm">${b.nm}</span></div>`}).join('')}
@@ -1189,9 +1235,11 @@ function timeAgo(ts){const d=Date.now()-ts;if(d<60000)return'just now';if(d<3600
 async function sCfg(){cfg.name=document.getElementById('cName').value;cfg.bio=document.getElementById('cBio').value;cfg.homeResort=document.getElementById('cRes').value;await saveS();updateProfile();await refreshComm();const t=document.getElementById('lapToast');t.innerHTML='✅ Profile Saved!';t.classList.add('show');setTimeout(()=>{t.classList.remove('show');t.innerHTML='🔄 RUN #<span id="lapNum">1</span>'},1500)}
 function sU(u){cfg.unit=u;document.getElementById('uM').classList.toggle('on',u==='metric');document.getElementById('uI').classList.toggle('on',u==='imperial');saveS();renderRuns();updateProfile()}
 function expAll(){const b=new Blob([JSON.stringify({settings:cfg,runs},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='skitrack-'+new Date().toISOString().slice(0,10)+'.json';a.click()}
-async function nukeAll(){if(!confirm('Delete ALL?'))return;if(!confirm('Really?'))return;runs=[];cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:cfg.uid};
+async function nukeAll(){if(!confirm('Delete ALL?'))return;if(!confirm('Really?'))return;
+const uid=cfg.uid;runs=[];cfg={name:'',bio:'',homeResort:'',unit:'metric',avatar:'⛷️',uid:uid};
+try{localStorage.removeItem('st-cfg-'+uid);localStorage.removeItem('st-runs-'+uid)}catch(e){}
+// Also clean old non-scoped keys from before v19
 try{localStorage.removeItem('st-runs');localStorage.removeItem('st-cfg')}catch(e){}
-if(hasArtifactStorage){try{await window.storage.delete('st-runs')}catch(e){}try{await window.storage.delete('st-cfg')}catch(e){}}
 applyCfg();renderRuns();updateProfile();renderBadges()}
 
 /* ═══ NAV ═══ */
