@@ -18,7 +18,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%230EA5E9' rx='20' width='100' height='100'/><text x='50' y='72' font-size='55' text-anchor='middle'>⛷️</text></svg>">
 <script>
 // Inline PWA manifest
-const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=25',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+const manifest={name:'SkiTrack',short_name:'SkiTrack',description:'Free ski tracking — GPS, weather, community',start_url:location.origin+location.pathname+'?v=26',display:'standalone',background_color:'#050A12',theme_color:'#050A12',orientation:'portrait',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect fill="%230EA5E9" rx="100" width="512" height="512"/><text x="256" y="370" font-size="280" text-anchor="middle">⛷️</text></svg>',sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
 const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
 const mUrl=URL.createObjectURL(mBlob);
 const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=mUrl;
@@ -524,11 +524,13 @@ textarea.fi{min-height:50px;resize:vertical}
 <button class="btn-p" onclick="saveEdit()" style="margin-top:6px">💾 Save Changes</button>
 <button class="btn-d" onclick="closeOv('ovEdit')">Cancel</button>
 </div></div>
+<!-- COMMUNITY RUN DETAIL -->
+<div class="ov" id="ovCommRun"><div class="sh" id="commRunSheet" style="max-height:85vh;overflow-y:auto"></div></div>
 </div>
 
 <script>
 /* ═══ VERSION & AUTO-UPDATE ═══ */
-const APP_VERSION='v25';
+const APP_VERSION='v26';
 (function(){
   try{
     const last=localStorage.getItem('skitrack-version');
@@ -869,8 +871,32 @@ async function publishProfile(){
 }
 async function publishActivity(run){
   if(!fbDb||isGuest)return;
-  const a={uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:run.id,runName:run.name,resort:run.resort,
-    dist:run.dist,maxSpd:run.maxSpd,runs:run.runs,eDrop:run.eDrop,sn:run.sn,wx:run.wx,notes:run.notes,rating:run.rating,ts:Date.now()};
+  // Create small preview photos for sharing (max 3, 400px, 40% quality ~15-25KB each)
+  let sharedPhotos=[];
+  if(run.photos&&run.photos.length){
+    for(let i=0;i<Math.min(3,run.photos.length);i++){
+      try{
+        const img=new Image();
+        await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;img.src=run.photos[i]});
+        const cv=document.createElement('canvas');
+        let w=img.width,h=img.height;if(w>400){h=Math.round(h*(400/w));w=400}
+        cv.width=w;cv.height=h;cv.getContext('2d').drawImage(img,0,0,w,h);
+        sharedPhotos.push(cv.toDataURL('image/jpeg',0.4));
+      }catch(e){}
+    }
+  }
+  // Build trace summary (start, end, and sampled points for mini-map)
+  let traceSummary=null;
+  if(run.trace&&run.trace.length>2){
+    const step=Math.max(1,Math.floor(run.trace.length/30));
+    traceSummary=run.trace.filter((_,i)=>i===0||i===run.trace.length-1||i%step===0).map(p=>({lat:p.lat,lng:p.lng}));
+  }
+  const a={uid:cfg.uid,name:cfg.name||'Anonymous',avatar:cfg.avatar||'⛷️',runId:run.id,runName:run.name,
+    resort:run.resort,customResort:run.customResort||'',
+    dist:run.dist,maxSpd:run.maxSpd,avgSpd:run.avgSpd||0,runs:run.runs,eDrop:run.eDrop,dur:run.dur||0,
+    sn:run.sn,wx:run.wx,notes:run.notes,rating:run.rating,
+    photos:sharedPhotos,trace:traceSummary,
+    ts:Date.now()};
   try{await fbDb.ref('activities/'+run.id).set(a)}catch(e){console.warn('Activity sync failed:',e)}
 }
 async function loadCommunity(){
@@ -923,6 +949,63 @@ async function reactFeed(runId,type){
     if(snap.val())await ref.remove();else await ref.set(true);
     await refreshComm();
   }catch(e){console.warn('React failed:',e)}
+}
+/* ═══ COMMUNITY RUN DETAIL ═══ */
+let commMap=null;
+function viewCommRun(runId){
+  const d=window._comm||{activities:[]};
+  const a=d.activities.find(x=>x.runId===runId);
+  if(!a)return;
+  const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';
+  const resNm=a.resort==='_custom'?(a.customResort||'Custom'):(RS.find(x=>x.id===a.resort)?.nm||'');
+  const tags=[...(a.sn||[]),...(a.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing'].includes(t)?'sn':'';return`<span class="tg ${c}">${t}</span>`}).join('');
+  const photos=a.photos||[];
+  const hasTrace=a.trace&&a.trace.length>2;
+  const isMe=a.uid===cfg.uid;
+  document.getElementById('commRunSheet').innerHTML=`
+    <div class="sh-bar"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:20px">${a.avatar||'⛷️'}</div>
+      <div><div style="font-weight:700;color:var(--t1);font-size:14px">${a.name}${isMe?' <span style="color:var(--ice);font-size:10px">(you)</span>':''}</div>
+      <div style="font-size:10px;color:var(--t4)">${timeAgo(a.ts)}${resNm?' · '+resNm:''}</div></div>
+    </div>
+    <h3 style="font-size:16px;color:var(--t1)">${a.runName||'Session'}</h3>
+    ${a.rating?`<div style="margin-top:2px">${'⭐'.repeat(a.rating)}</div>`:''}
+    ${hasTrace?`<div class="rd-minimap" style="margin-top:10px"><div id="commRunMap"></div></div>`:''}
+    <div class="sg" style="margin-top:12px">
+      <div class="sx"><div class="si">📏</div><div class="sv">${f(a.dist||0).toFixed(2)}${ud}</div><div class="sl">Distance</div></div>
+      <div class="sx"><div class="si">⚡</div><div class="sv">${f(a.maxSpd||0).toFixed(1)}${us}</div><div class="sl">Top Speed</div></div>
+      <div class="sx"><div class="si">📊</div><div class="sv">${f(a.avgSpd||0).toFixed(1)}${us}</div><div class="sl">Avg Speed</div></div>
+      <div class="sx"><div class="si">🎿</div><div class="sv">${a.runs||1}</div><div class="sl">Runs</div></div>
+      <div class="sx"><div class="si">⏱️</div><div class="sv">${fmtD(a.dur||0)}</div><div class="sl">Duration</div></div>
+      <div class="sx"><div class="si">🏔️</div><div class="sv">${Math.round(a.eDrop||0)}m</div><div class="sl">Vert Drop</div></div>
+    </div>
+    ${photos.length?`<div class="rd-section-title" style="margin-top:12px">Photos</div><div class="rd-photos">${photos.map(p=>`<img src="${p}" class="rd-photo" onclick="showFullPhoto(this.src)">`).join('')}</div>`:''}
+    ${tags?`<div class="rd-section-title" style="margin-top:12px">Conditions</div><div class="rc-tags">${tags}</div>`:''}
+    ${a.notes?`<div class="rd-section-title" style="margin-top:12px">Notes</div><div style="font-size:12px;color:var(--t2);line-height:1.6;padding:10px 12px;background:var(--bg3);border-radius:10px;border:1px solid var(--bd1)">"${a.notes}"</div>`:''}
+    ${isMe?`<button class="btn-g" onclick="closeOv('ovCommRun');viewR('${a.runId}')" style="margin-top:12px">📋 View Full Detail</button>`:''}
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <div class="feed-act ${(a.likes||[]).includes(cfg.uid)?'liked':''}" onclick="reactFeed('${a.runId}','likes')" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd1);cursor:pointer">❤️ ${(a.likes||[]).length||0} Likes</div>
+      <div class="feed-act ${(a.cheers||[]).includes(cfg.uid)?'cheered':''}" onclick="reactFeed('${a.runId}','cheers')" style="flex:1;text-align:center;padding:10px;border-radius:10px;background:var(--bg3);border:1px solid var(--bd1);cursor:pointer">🤙 ${(a.cheers||[]).length||0} Cheers</div>
+    </div>
+  `;
+  openOv('ovCommRun');
+  // Init mini-map from trace summary
+  if(hasTrace){
+    setTimeout(()=>{
+      if(commMap){commMap.remove();commMap=null}
+      const el=document.getElementById('commRunMap');if(!el||typeof L==='undefined')return;
+      commMap=L.map('commRunMap',{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false});
+      L.tileLayer(TL.gmaps.url,{maxZoom:19,subdomains:'0123'}).addTo(commMap);
+      const latlngs=a.trace.map(p=>[p.lat,p.lng]);
+      L.polyline(latlngs,{color:'#F59E0B',weight:3,opacity:.9}).addTo(commMap);
+      if(latlngs.length>0){
+        L.circleMarker(latlngs[0],{radius:4,color:'#22C55E',fillColor:'#22C55E',fillOpacity:1,weight:2}).addTo(commMap);
+        L.circleMarker(latlngs[latlngs.length-1],{radius:4,color:'#EF4444',fillColor:'#EF4444',fillOpacity:1,weight:2}).addTo(commMap);
+      }
+      commMap.fitBounds(L.polyline(latlngs).getBounds(),{padding:[20,20]});
+    },300);
+  }
 }
 
 /* ═══ INIT ═══ */
@@ -1131,8 +1214,6 @@ function onPos(pos){
   const avg=tk.spd.length?tk.spd.reduce((a,b)=>a+b,0)/tk.spd.length:0;
   document.getElementById('tv-avg').textContent=f(avg).toFixed(1);
   document.getElementById('tv-run').textContent=tk.nR;
-  // GPS point counter (visible proof tracking is working)
-  document.getElementById('tv-state').textContent+=' · '+tk.pos.length+' pts';
   placeU(c);if(trkPoly)trkPoly.addLatLng([c.latitude,c.longitude]);
   userPos={lat:c.latitude,lng:c.longitude};
   // Auto-save every 30 points (crash protection)
@@ -1420,7 +1501,12 @@ async function refreshComm(){
     document.getElementById('feedList').innerHTML='<div style="padding:12px;background:var(--red-d);border:1px solid rgba(248,113,113,.3);border-radius:10px;font-size:10px;color:var(--red)">Community error: '+e.message+'</div>';
   }
 }
-function renderFeed(){const d=window._comm||{activities:[]};const el=document.getElementById('feedList');if(!d.activities.length){el.innerHTML='<div class="empty-st"><div class="es-i">🏔️</div><p>No activity yet</p></div>';return}const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';el.innerHTML=d.activities.slice(0,20).map(a=>{const res=RS.find(x=>x.id===a.resort);const tags=[...(a.sn||[]),...(a.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing'].includes(t)?'sn':'';return`<span class="tg ${c}">${t}</span>`}).join('');const isMe=a.uid===cfg.uid;return`<div class="feed-card"><div class="feed-hdr"><div class="feed-av">${a.avatar||'⛷️'}</div><div class="feed-meta"><div class="feed-name">${a.name}${isMe?' <span style="color:var(--ice);font-size:9px">(you)</span>':''}</div><div class="feed-time">${timeAgo(a.ts)}${res?' · '+res.nm:''}</div></div></div><div class="feed-body">${a.runName}${a.notes?' — "'+a.notes+'"':''} ${a.rating?'⭐'.repeat(a.rating):''}</div><div class="feed-stats"><div class="feed-stat"><div class="fv">${f(a.dist).toFixed(1)}${ud}</div><div class="fl">Dist</div></div><div class="feed-stat"><div class="fv">${f(a.maxSpd).toFixed(0)}${us}</div><div class="fl">Top</div></div><div class="feed-stat"><div class="fv">${a.runs||1}</div><div class="fl">Runs</div></div></div>${tags?`<div class="feed-tags">${tags}</div>`:''}<div class="feed-actions"><div class="feed-act ${(a.likes||[]).includes(cfg.uid)?'liked':''}" onclick="reactFeed('${a.runId}','likes')">❤️ ${(a.likes||[]).length||''}</div><div class="feed-act ${(a.cheers||[]).includes(cfg.uid)?'cheered':''}" onclick="reactFeed('${a.runId}','cheers')">🤙 ${(a.cheers||[]).length||''}</div></div></div>`}).join('')}
+function renderFeed(){const d=window._comm||{activities:[]};const el=document.getElementById('feedList');if(!d.activities.length){el.innerHTML='<div class="empty-st"><div class="es-i">🏔️</div><p>No activity yet</p></div>';return}const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v,ud=imp?' mi':' km',us=imp?' mph':' km/h';el.innerHTML=d.activities.slice(0,20).map(a=>{
+const resNm=a.resort==='_custom'?(a.customResort||''):(RS.find(x=>x.id===a.resort)?.nm||'');
+const tags=[...(a.sn||[]),...(a.wx||[])].map(t=>{const c=t==='powder'?'pw':['snowing','freezing'].includes(t)?'sn':'';return`<span class="tg ${c}">${t}</span>`}).join('');
+const isMe=a.uid===cfg.uid;
+const photos=a.photos||[];
+return`<div class="feed-card" style="cursor:pointer" onclick="viewCommRun('${a.runId}')"><div class="feed-hdr"><div class="feed-av">${a.avatar||'⛷️'}</div><div class="feed-meta"><div class="feed-name">${a.name}${isMe?' <span style="color:var(--ice);font-size:9px">(you)</span>':''}</div><div class="feed-time">${timeAgo(a.ts)}${resNm?' · '+resNm:''}</div></div></div><div class="feed-body">${a.runName||'Session'}${a.notes?' — "'+a.notes+'"':''} ${a.rating?'⭐'.repeat(a.rating):''}</div><div class="feed-stats"><div class="feed-stat"><div class="fv">${f(a.dist||0).toFixed(1)}${ud}</div><div class="fl">Dist</div></div><div class="feed-stat"><div class="fv">${f(a.maxSpd||0).toFixed(0)}${us}</div><div class="fl">Top</div></div><div class="feed-stat"><div class="fv">${a.runs||1}</div><div class="fl">Runs</div></div></div>${photos.length?`<div style="display:flex;gap:4px;margin-top:6px">${photos.slice(0,3).map(p=>`<img src="${p}" style="width:60px;height:60px;border-radius:8px;object-fit:cover;border:1px solid var(--bd1)">`).join('')}</div>`:''}${tags?`<div class="feed-tags">${tags}</div>`:''}<div class="feed-actions" onclick="event.stopPropagation()"><div class="feed-act ${(a.likes||[]).includes(cfg.uid)?'liked':''}" onclick="reactFeed('${a.runId}','likes')">❤️ ${(a.likes||[]).length||''}</div><div class="feed-act ${(a.cheers||[]).includes(cfg.uid)?'cheered':''}" onclick="reactFeed('${a.runId}','cheers')">🤙 ${(a.cheers||[]).length||''}</div></div></div>`}).join('')}
 function renderLB(){const d=window._comm||{profiles:[]};const cat=document.querySelector('.lb-cat.on')?.dataset.cat||'topspeed';const el=document.getElementById('lbList');let s=[...d.profiles];if(cat==='topspeed')s.sort((a,b)=>(b.stats?.topSpd||0)-(a.stats?.topSpd||0));else if(cat==='distance')s.sort((a,b)=>(b.stats?.dist||0)-(a.stats?.dist||0));else if(cat==='vertical')s.sort((a,b)=>(b.stats?.vert||0)-(a.stats?.vert||0));else s.sort((a,b)=>(b.stats?.runs||0)-(a.stats?.runs||0));s=s.slice(0,20);const imp=cfg.unit==='imperial',f=v=>imp?v*.621371:v;if(!s.length){el.innerHTML='<div class="empty-st"><p>No riders yet</p></div>';return}el.innerHTML=s.map((p,i)=>{const rc=i===0?'g':i===1?'s':i===2?'b':'';let val='';if(cat==='topspeed')val=f(p.stats?.topSpd||0).toFixed(0)+(imp?' mph':' km/h');else if(cat==='distance')val=f(p.stats?.dist||0).toFixed(1)+(imp?' mi':' km');else if(cat==='vertical')val=(p.stats?.vert||0).toLocaleString()+' m';else val=(p.stats?.runs||0);const isMe=p.uid===cfg.uid;return`<div class="lb-card" style="${isMe?'border-color:var(--ice);background:var(--ice-d)':''}"><div class="lb-rank ${rc}">${i+1}</div><div class="lb-av">${p.avatar||'⛷️'}</div><div class="lb-info"><div class="lb-name">${p.name}${isMe?' (you)':''}</div><div class="lb-sub">${p.stats?.sessions||0} sessions</div></div><div class="lb-val">${val}</div></div>`}).join('')}
 function lbCat(c){document.querySelectorAll('.lb-cat').forEach(b=>b.classList.toggle('on',b.dataset.cat===c));renderLB()}
 function renderMembers(){const d=window._comm||{profiles:[]};const el=document.getElementById('membersList');if(!d.profiles.length){el.innerHTML='<div class="empty-st"><p>No riders</p></div>';return}el.innerHTML=d.profiles.map(p=>{const res=RS.find(x=>x.id===p.resort);const isMe=p.uid===cfg.uid;return`<div class="member-card"><div class="m-av">${p.avatar||'⛷️'}</div><div class="m-info"><div class="m-nm">${p.name}${isMe?' <span style="color:var(--ice)">(you)</span>':''}</div><div class="m-bio">${p.bio||'No bio'}${res?' · '+res.nm:''}</div><div class="m-stats">${p.stats?.sessions||0} sessions · ${p.stats?.runs||0} runs · ${(p.badges||[]).length} badges</div></div></div>`}).join('')}
@@ -1444,6 +1530,7 @@ function closeOv(id){document.getElementById(id).classList.remove('on')}
 // Save modal: NO click-outside dismiss — must use Save or Discard buttons
 document.getElementById('ovView').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovView')});
 document.getElementById('ovAvatar').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovAvatar')});
+document.getElementById('ovCommRun').addEventListener('click',e=>{if(e.target===e.currentTarget)closeOv('ovCommRun')});
 
 /* ═══ UTILS ═══ */
 function hav(a,b,c,d){const R=6371,dL=(c-a)*Math.PI/180,dN=(d-b)*Math.PI/180,x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x))}
